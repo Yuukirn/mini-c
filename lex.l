@@ -14,6 +14,7 @@ int yycolumn=1;
 typedef struct {
 	int type_int;
 	int type_float;
+    char type_char;
 	char type_id[32];
 } YYLVAL;
 #define YYSTYPE YYLVAL
@@ -24,10 +25,12 @@ typedef struct {
 id   [A-Za-z][A-Za-z0-9]*
 intconst    0|([1-9][0-9]*)
 floatconst    [0-9]*\.?[0-9]?([eE][-+]?[0-9]+)?
+charconst \'([^'\\]|\\.)\'
 
 %%
 "int"   	{strcpy(yylval.type_id,  yytext);return TYPE;}
 "float"     {strcpy(yylval.type_id,  yytext);return TYPE;}
+"char"      {strcpy(yylval.type_id,  yytext);return TYPE;}
 "void"      {strcpy(yylval.type_id,  yytext);return TYPE;}
 
 "return"    {return RETURN;}
@@ -62,6 +65,7 @@ floatconst    [0-9]*\.?[0-9]?([eE][-+]?[0-9]+)?
 "}"	    {return RC;}
 {intconst}      { yylval.type_int=atoi(yytext); return INT;}
 {floatconst}    { yylval.type_float=atof(yytext);     return FLOAT;}
+{charconst}     { yylval.type_char=yytext[1]; return CHAR;}
 [ \r\t]     	{}
 
 [\n]        	{yycolumn=1;}

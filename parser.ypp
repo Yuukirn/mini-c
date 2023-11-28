@@ -13,6 +13,7 @@ typedef struct YYLVAL
 {
 	int         type_int;
 	float       type_float;
+    char        type_char;
 	char        type_id[32];
 
 	ProgAST     *program;
@@ -63,6 +64,7 @@ typedef struct YYLVAL
 %token <type_int> INT                   /*指定INT常量的语义值是type_int，由词法分析得到的整数数值*/
 %token <type_id>  ID TYPE               /*指定ID 的语义值是type_id，由词法分析得到的标识符字符串*/
 %token <type_float> FLOAT               /*指定float常量的语义值是type_float*/
+%token <type_char> CHAR
 
 %token DPLUS DMINUS LP RP LB RB LC RC SEMI COMMA     /*用bison对该文件编译时，带参数-d，生成的exp.tab.h中给这些单词进行编码，可在lex.l中包含parser.tab.h使用这些单词种类码*/
 %token PLUS MINUS STAR DIV GE GT LE LT NE EQ ASSIGN AND OR NOT IF ELSE WHILE RETURN FOR COLON STRUCT
@@ -111,6 +113,7 @@ ExtDef:   Specifier ExtDecList SEMI   { ExtVarDefAST *t=new ExtVarDefAST();     
 Specifier: TYPE  {  BasicTypeAST *t=new BasicTypeAST(); ;
                     if (string($1)==string("int"))    t->Type=T_INT;
                     if (string($1)==string("float"))  t->Type=T_FLOAT;
+                    if (string($1)==string("char"))   t->Type=T_CHAR;
                     if (string($1)==string("void"))   t->Type=T_VOID;  $$=t;SavePosition;}
               ;
 
@@ -197,6 +200,7 @@ Exp:    Exp ASSIGN Exp {AssignAST *t=new AssignAST();t->Op=ASSIGN;
       | ID            	{VarAST *t=new VarAST();t->Name=$1;$$=t;SavePosition;}
       | INT           	{ConstAST *t=new ConstAST();t->Type=T_INT;t->ConstVal.constINT=$1;$$=t;SavePosition;}
       | FLOAT         	{ConstAST *t=new ConstAST();t->Type=T_FLOAT;t->ConstVal.constFLOAT=$1;$$=t;SavePosition;}
+      | CHAR            {ConstAST *t=new ConstAST();t->Type=T_CHAR;t->ConstVal.constCHAR=$1;$$=t;SavePosition;}
  //     | error SEMI   {$$=NULL;}
        ;
 Args:   {}
