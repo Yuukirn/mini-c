@@ -7,3 +7,5 @@ cmake-build-debug/
 
 lex.yy.c
 parser.tab.*
+
+test*

@@ -49,6 +49,7 @@ floatconst    [0-9]*\.?[0-9]?([eE][-+]?[0-9]+)?
 "="	    {return ASSIGN;}
 "++"	{return DPLUS;}
 "+"	    {return PLUS;}
+"--"    {return DMINUS;}
 "-"	    {return MINUS;}
 "*"	    {return STAR;}
 "/"	    {return DIV;}

@@ -64,7 +64,7 @@ typedef struct YYLVAL
 %token <type_id>  ID TYPE               /*指定ID 的语义值是type_id，由词法分析得到的标识符字符串*/
 %token <type_float> FLOAT               /*指定float常量的语义值是type_float*/
 
-%token DPLUS LP RP LB RB LC RC SEMI COMMA     /*用bison对该文件编译时，带参数-d，生成的exp.tab.h中给这些单词进行编码，可在lex.l中包含parser.tab.h使用这些单词种类码*/
+%token DPLUS DMINUS LP RP LB RB LC RC SEMI COMMA     /*用bison对该文件编译时，带参数-d，生成的exp.tab.h中给这些单词进行编码，可在lex.l中包含parser.tab.h使用这些单词种类码*/
 %token PLUS MINUS STAR DIV GE GT LE LT NE EQ ASSIGN AND OR NOT IF ELSE WHILE RETURN FOR COLON STRUCT
 
 /*以下为接在上述token后依次编码的枚举常量，用于后续过程*/
@@ -79,7 +79,7 @@ typedef struct YYLVAL
 %left NE EQ
 %left PLUS MINUS
 %left STAR DIV
-%right UMINUS NOT DPLUS UPLUS
+%right DMINUS UMINUS NOT DPLUS UPLUS
 
 %nonassoc LOWER_THEN_ELSE
 %nonassoc ELSE
@@ -94,7 +94,7 @@ program: ExtDefList  {$$=new ProgAST(); $$->ExtDefs=$1;
                       $$->Semantics0();                   //静态语义检查
                       if (Errors::IsEmpty())
                           $$->GenIR();                    //中间代码生成
-                      system("pause");
+                      system("read -n 1");
                       }
          ;
 ExtDefList: {$$=vector <ExtDefAST*>();}
@@ -190,6 +190,7 @@ Exp:    Exp ASSIGN Exp {AssignAST *t=new AssignAST();t->Op=ASSIGN;
 
 
       | DPLUS  Exp      {UnaryExprAST *t=new UnaryExprAST();t->Op=DPLUS;t->Exp=$2;$$=t;SavePosition;}    //自增、自减运算符。。。可区分前后缀形式
+      | DMINUS Exp      {UnaryExprAST *t=new UnaryExprAST();t->Op=DMINUS;t->Exp=$2;$$=t;SavePosition;}
 
 
       | ID LP Args RP 	{FuncCallAST *t=new FuncCallAST();t->Name=$1;t->Params=$3;$$=t;SavePosition;}
