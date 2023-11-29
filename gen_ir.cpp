@@ -268,6 +268,9 @@ void WhileStmAST::GenIR() {
   IRCodes.push_back(
       IRCode(LABEL, Opn(), Opn(), Opn(LoopEnd, 0, 0))); // 循环结束标号
 }
+void ForStmAST::GenIR() {
+  // TODO: implement me
+}
 void ReturnStmAST::GenIR() {
   if (!Exp)
     return;
@@ -277,7 +280,12 @@ void ReturnStmAST::GenIR() {
   IRCodes.splice(it, Exp->IRCodes);
   IRCodes.push_back(IRCode(RETURN, Opn(), Opn(), Result));
 }
-
+void BreakStmAST::GenIR() {
+  // TODO: implement me
+}
+void ContinueStmAST::GenIR() {
+  // TODO: implement me
+}
 /**************表达式的中间代码生成************************/
 Opn VarAST::GenIR(int &TempVarOffset) {
   // 通过语义检查后，VarRef指向对应表项，否则为空，程序会崩溃

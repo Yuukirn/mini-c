@@ -19,6 +19,8 @@ class VarDecAST;
 class ParamAST;
 class CompStmAST;
 class ExpAST;
+class StructTypeAST;
+class StructDefAST;
 
 class VarSymbol;
 class FuncSymbol;
@@ -53,8 +55,9 @@ public:
 
 class VarSymbol : public Symbol {
 public:
-  string Alias; // 别名，为解决中间代码中，作用域嵌套变量同名的显示时的二义性问题
-  int Offset;   // 变量在对应AR中的偏移量
+  string
+      Alias; // 别名，为解决中间代码中，作用域嵌套变量同名的显示时的二义性问题
+  int Offset; // 变量在对应AR中的偏移量
 };
 
 class FuncSymbol : public Symbol {
@@ -173,12 +176,12 @@ public:
   void GenIR() override;
 };
 
-// class StructDefAST:public TypeAST{//结构类型名
-// public:
-//     string Name;
-//     vector <defAST *> vars;
-//     void DisplayAST(int indent) override;
-// };
+class StructDefAST : public TypeAST { // 结构类型名
+public:
+  string Name;
+  vector<VarDecAST *> vars;
+  void DisplayAST(int indent) override;
+};
 
 class VarDecAST : public AST { // 简单变量（标识符）、数组的定义
 public:
@@ -193,6 +196,7 @@ public:
   void GenIR() override;
 };
 
+// 数组初始化
 // class ArrayInitAST public ExpAST
 //{
 // public:
@@ -288,10 +292,36 @@ public:
   void GenIR() override;
 };
 
+class ForStmAST : public StmAST { // for
+public:
+  ExpAST *Init;
+  ExpAST *Cond;
+  ExpAST *Update;
+  StmAST *Body;
+
+  void DisplayAST(int l) override;
+  void Semantics(int &Offset) override;
+  void GenIR() override;
+};
+
 class ReturnStmAST : public StmAST { // 表达式语句
 public:
   ExpAST *Exp;
 
+  void DisplayAST(int l) override;
+  void Semantics(int &Offset) override;
+  void GenIR() override;
+};
+
+class BreakStmAST : public StmAST {
+public:
+  void DisplayAST(int l) override;
+  void Semantics(int &Offset) override;
+  void GenIR() override;
+};
+
+class ContinueStmAST : public StmAST {
+public:
   void DisplayAST(int l) override;
   void Semantics(int &Offset) override;
   void GenIR() override;

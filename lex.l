@@ -14,7 +14,7 @@ int yycolumn=1;
 typedef struct {
 	int type_int;
 	int type_float;
-    char type_char;
+  int type_char;
 	char type_id[32];
 } YYLVAL;
 #define YYSTYPE YYLVAL
@@ -38,11 +38,15 @@ charconst \'([^'\\]|\\.)\'
 "else"      {return ELSE;}
 "while"     {return WHILE;}
 "for"       {return FOR;}
+"break"     {return BREAK;}
+"continue"  {return CONTINUE;}
+"struct"    {return STRUCT;}
 
 
 {id}	{strcpy(yylval.type_id,yytext); return ID;}
 ";"	    {return SEMI;}
 ","	    {return COMMA;}
+"."     {return DOT;}
 ">="	{strcpy(yylval.type_id, yytext);return GE;}
 ">"	    {strcpy(yylval.type_id, yytext);return GT;}
 "<="	{strcpy(yylval.type_id, yytext);return LE;}
@@ -61,11 +65,24 @@ charconst \'([^'\\]|\\.)\'
 "!"	    {return NOT;}
 "("	    {return LP;}
 ")"	    {return RP;}
+"["     {return LB;}
+"]"     {return RB;}
 "{"	    {return LC;}
 "}"	    {return RC;}
 {intconst}      { yylval.type_int=atoi(yytext); return INT;}
 {floatconst}    { yylval.type_float=atof(yytext);     return FLOAT;}
 {charconst}     { yylval.type_char=yytext[1]; return CHAR;}
+"/*"            {
+                  char c;
+                  while (c != EOF && ((c = input()) != '/')) {
+                    if (c == EOF) break;
+                    if (c == '\n') yylineno++;
+                    while (c != EOF && ((c = input()) != '*')) {
+                      if (c == EOF) break;
+                      if (c == '\n') yylineno++;
+                    };
+                  }
+                }
 [ \r\t]     	{}
 
 [\n]        	{yycolumn=1;}

@@ -66,8 +66,8 @@ typedef struct YYLVAL
 %token <type_float> FLOAT               /*指定float常量的语义值是type_float*/
 %token <type_char> CHAR
 
-%token DPLUS DMINUS LP RP LB RB LC RC SEMI COMMA     /*用bison对该文件编译时，带参数-d，生成的exp.tab.h中给这些单词进行编码，可在lex.l中包含parser.tab.h使用这些单词种类码*/
-%token PLUS MINUS STAR DIV GE GT LE LT NE EQ ASSIGN AND OR NOT IF ELSE WHILE RETURN FOR COLON STRUCT
+%token DPLUS DMINUS LP RP LB RB LC RC SEMI COMMA DOT     /*用bison对该文件编译时，带参数-d，生成的exp.tab.h中给这些单词进行编码，可在lex.l中包含parser.tab.h使用这些单词种类码*/
+%token PLUS MINUS STAR DIV GE GT LE LT NE EQ ASSIGN AND OR NOT IF ELSE WHILE RETURN FOR COLON STRUCT BREAK CONTINUE
 
 /*以下为接在上述token后依次编码的枚举常量，用于后续过程*/
 %token EXT_DEF_LIST EXT_VAR_DEF FUNC_DEF FUNC_DEC EXT_DEC_LIST PARAM_LIST PARAM_DEC VAR_DEF DEC_LIST DEF_LIST COMP_STM STM_LIST EXP_STMT IF_THEN IF_THEN_ELSE
@@ -105,8 +105,8 @@ ExtDefList: {$$=vector <ExtDefAST*>();}
 
 ExtDef:   Specifier ExtDecList SEMI   { ExtVarDefAST *t=new ExtVarDefAST();     //创建一个外部变量声明的对象
                                         t->Type=$1; t->ExtVars=$2;$$=t;SavePosition;}
-  //       | StructSpecifier SEMI   {}
-//         | StructSpecifier ExtDecList SEMI   {}
+         /* | StructSpecifier SEMI LC RC
+         | StructSpecifier ExtDecList SEMI LC RC */
          | Specifier ID LP ParamList RP CompSt  {FuncDefAST *t=new FuncDefAST();t->Type=$1;t->Name=$2;t->Params=$4; t->Body=$6;$$=t;SavePosition;}//对应一个函数定义对象
          | Specifier ID LP ParamList RP SEMI   {FuncDefAST *t=new FuncDefAST();t->Type=$1;t->Name=$2;t->Params=$4;$$=t;SavePosition;}//对应一个函数声明对象，Body为空
          ;
@@ -115,10 +115,18 @@ Specifier: TYPE  {  BasicTypeAST *t=new BasicTypeAST(); ;
                     if (string($1)==string("float"))  t->Type=T_FLOAT;
                     if (string($1)==string("char"))   t->Type=T_CHAR;
                     if (string($1)==string("void"))   t->Type=T_VOID;  $$=t;SavePosition;}
+         /* | STRUCT ID LB DefList RB {} */
+         /* | STRUCT LB DecList RB {} */
+         /* | STRUCT ID {} */
               ;
 
-//StructSpecifier: STRUCT ID  {ExtDefList}      //结构类型
-            ;
+/* StructSpecifier: STRUCT ID LC ExtDefList RC      //结构类型 */
+            /* ; */
+
+/* StructSpecifier: STRUCT ID LB DefList RB
+           | STRUCT LB DecList RB
+           | STRUCT ID */
+
 ExtDecList:  VarDec  {$$=vector < VarDecAST*>();$$.push_back($1);}      /*ExtDecList对应一个外部变量VarDec的序列,目前后续只考虑是标识符，可扩展为数组*/
            | VarDec COMMA ExtDecList {$3.insert($3.begin(),$1);$$=$3;}
            ;
@@ -163,9 +171,12 @@ Stmt:   Exp SEMI    		{ExprStmAST *t=new ExprStmAST();t->Exp=$1;$$=t;SavePositio
       | CompSt      		{$$=$1;}      //复合语句不再生成新的结点
       | RETURN Exp SEMI   	{ReturnStmAST *t=new ReturnStmAST();t->Exp=$2;$$=t;SavePosition;}
       | RETURN SEMI   	    {ReturnStmAST *t=new ReturnStmAST();t->Exp=NULL;$$=t;SavePosition;}
+      /* | BREAK SEMI          {BreakStmAST *t=new BreakStmAST();$$=t;SavePosition;} */
+      /* | CONTINUE SEMI       {ContinueStmAST *t=new ContinueStmAST();$$=t;SavePosition;} */
       | IF LP Exp RP Stmt %prec LOWER_THEN_ELSE {IfStmAST *t=new IfStmAST();t->Cond=$3;t->ThenStm=$5;$$=t; SavePosition;}
       | IF LP Exp RP Stmt ELSE Stmt   		    {IfElseStmAST *t=new IfElseStmAST();t->Cond=$3;t->ThenStm=$5;t->ElseStm=$7;$$=t;SavePosition;}
       | WHILE LP Exp RP Stmt 	{WhileStmAST *t=new WhileStmAST();t->Cond=$3;t->Body=$5;$$=t; SavePosition;}
+      /* | FOR LP Exp SEMI Exp SEMI Exp RP Stmt {ForStmAST *t=new ForStmAST();t->Init=$3;t->Cond=$5;t->Update=$7;t->Body=$9;$$=t; SavePosition;} */
       | error SEMI   {$$=NULL;}
       ;
 
@@ -190,6 +201,9 @@ Exp:    Exp ASSIGN Exp {AssignAST *t=new AssignAST();t->Op=ASSIGN;
       | Exp LE Exp 	{BinaryExprAST *t=new BinaryExprAST();t->Op=LE;t->LeftExp=$1;t->RightExp=$3;$$=t;SavePosition;}
       | Exp NE Exp 	{BinaryExprAST *t=new BinaryExprAST();t->Op=NE;t->LeftExp=$1;t->RightExp=$3;$$=t;SavePosition;}
       | Exp EQ Exp 	{BinaryExprAST *t=new BinaryExprAST();t->Op=EQ;t->LeftExp=$1;t->RightExp=$3;$$=t;SavePosition;}
+
+      /* | Exp LB Exp RB // 数组取值 */
+      /* | Exp DOT ID // 结构体取字段 */
 
 
       | DPLUS  Exp      {UnaryExprAST *t=new UnaryExprAST();t->Op=DPLUS;t->Exp=$2;$$=t;SavePosition;}    //自增、自减运算符。。。可区分前后缀形式
