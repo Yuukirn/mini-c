@@ -288,10 +288,36 @@ public:
   void GenIR() override;
 };
 
+class ForStmAST : public StmAST { // for
+public:
+  ExpAST *Init;
+  ExpAST *Cond;
+  ExpAST *Update;
+  StmAST *Body;
+
+  void DisplayAST(int l) override;
+  void Semantics(int &Offset) override;
+  void GenIR() override;
+};
+
 class ReturnStmAST : public StmAST { // 表达式语句
 public:
   ExpAST *Exp;
 
+  void DisplayAST(int l) override;
+  void Semantics(int &Offset) override;
+  void GenIR() override;
+};
+
+class BreakStmAST : public StmAST {
+public:
+  void DisplayAST(int l) override;
+  void Semantics(int &Offset) override;
+  void GenIR() override;
+};
+
+class ContinueStmAST : public StmAST {
+public:
   void DisplayAST(int l) override;
   void Semantics(int &Offset) override;
   void GenIR() override;

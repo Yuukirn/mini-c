@@ -259,10 +259,18 @@ void WhileStmAST::Semantics(int &Offset) {
   Cond->Semantics(Offset);
   Body->Semantics(Offset);
 }
+void ForStmAST::Semantics(int &Offset) {
+  Init->Semantics(Offset);
+  Cond->Semantics(Offset);
+  Update->Semantics(Offset);
+  Body->Semantics(Offset);
+}
 void ReturnStmAST::Semantics(int &Offset) {
   if (Exp)
     Exp->Semantics(Offset);
 }
+void BreakStmAST::Semantics(int &Offset) {}
+void ContinueStmAST::Semantics(int &Offset) {}
 
 /**************表达式显示******************************/
 void VarAST::Semantics(int &Offset) {

@@ -38,6 +38,8 @@ charconst \'([^'\\]|\\.)\'
 "else"      {return ELSE;}
 "while"     {return WHILE;}
 "for"       {return FOR;}
+"break"     {return BREAK;}
+"continue"  {return CONTINUE;}
 
 
 {id}	{strcpy(yylval.type_id,yytext); return ID;}
@@ -61,6 +63,8 @@ charconst \'([^'\\]|\\.)\'
 "!"	    {return NOT;}
 "("	    {return LP;}
 ")"	    {return RP;}
+"["     {return LB;}
+"]"     {return RB;}
 "{"	    {return LC;}
 "}"	    {return RC;}
 {intconst}      { yylval.type_int=atoi(yytext); return INT;}

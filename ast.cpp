@@ -150,6 +150,29 @@ void WhileStmAST::DisplayAST(int indent) { // 显示while循环语句
   cout << "循环体：" << endl;
   Body->DisplayAST(indent + 8);
 }
+
+void ForStmAST::DisplayAST(int indent) { // 显示for循环语句
+  space(indent);
+  cout << "for语句：" << endl;
+  space(indent + 2);
+  cout << "初始化：" << endl;
+  Init->DisplayAST(indent + 8);
+
+  cout << endl;
+  space(indent + 2);
+  cout << "循环条件：" << endl;
+  Cond->DisplayAST(indent + 8);
+
+  cout << endl;
+  space(indent + 2);
+  cout << "步长：" << endl;
+  Update->DisplayAST(indent + 8);
+  
+  space(indent + 2);
+  cout << "循环体：" << endl;
+  Body->DisplayAST(indent + 8);
+}
+
 void ReturnStmAST::DisplayAST(int indent) { // 显示返回语句
   space(indent);
   if (Exp) {
@@ -158,6 +181,16 @@ void ReturnStmAST::DisplayAST(int indent) { // 显示返回语句
   } else
     cout << "返回语句" << endl;
   cout << endl;
+}
+
+void BreakStmAST::DisplayAST(int indent) {
+  space(indent);
+  cout << "break语句" << endl << endl;
+}
+
+void ContinueStmAST::DisplayAST(int indent) {
+  space(indent);
+  cout << "continue语句" << endl << endl;
 }
 
 void DefAST::DisplayAST(int indent) { // 显示局部变量

@@ -2,6 +2,7 @@
 %locations
 %{
 #include "def.h"
+#include <iostream>
 extern int ErrorCharNum;
 extern int yylineno;
 extern char *yytext;
@@ -67,7 +68,7 @@ typedef struct YYLVAL
 %token <type_char> CHAR
 
 %token DPLUS DMINUS LP RP LB RB LC RC SEMI COMMA     /*用bison对该文件编译时，带参数-d，生成的exp.tab.h中给这些单词进行编码，可在lex.l中包含parser.tab.h使用这些单词种类码*/
-%token PLUS MINUS STAR DIV GE GT LE LT NE EQ ASSIGN AND OR NOT IF ELSE WHILE RETURN FOR COLON STRUCT
+%token PLUS MINUS STAR DIV GE GT LE LT NE EQ ASSIGN AND OR NOT IF ELSE WHILE RETURN FOR COLON STRUCT BREAK CONTINUE
 
 /*以下为接在上述token后依次编码的枚举常量，用于后续过程*/
 %token EXT_DEF_LIST EXT_VAR_DEF FUNC_DEF FUNC_DEC EXT_DEC_LIST PARAM_LIST PARAM_DEC VAR_DEF DEC_LIST DEF_LIST COMP_STM STM_LIST EXP_STMT IF_THEN IF_THEN_ELSE
@@ -163,9 +164,12 @@ Stmt:   Exp SEMI    		{ExprStmAST *t=new ExprStmAST();t->Exp=$1;$$=t;SavePositio
       | CompSt      		{$$=$1;}      //复合语句不再生成新的结点
       | RETURN Exp SEMI   	{ReturnStmAST *t=new ReturnStmAST();t->Exp=$2;$$=t;SavePosition;}
       | RETURN SEMI   	    {ReturnStmAST *t=new ReturnStmAST();t->Exp=NULL;$$=t;SavePosition;}
+      | BREAK SEMI          {BreakStmAST *t=new BreakStmAST();$$=t;SavePosition;}
+      | CONTINUE SEMI       {ContinueStmAST *t=new ContinueStmAST();$$=t;SavePosition;}
       | IF LP Exp RP Stmt %prec LOWER_THEN_ELSE {IfStmAST *t=new IfStmAST();t->Cond=$3;t->ThenStm=$5;$$=t; SavePosition;}
       | IF LP Exp RP Stmt ELSE Stmt   		    {IfElseStmAST *t=new IfElseStmAST();t->Cond=$3;t->ThenStm=$5;t->ElseStm=$7;$$=t;SavePosition;}
       | WHILE LP Exp RP Stmt 	{WhileStmAST *t=new WhileStmAST();t->Cond=$3;t->Body=$5;$$=t; SavePosition;}
+      | FOR LP Exp SEMI Exp SEMI Exp RP Stmt {ForStmAST *t=new ForStmAST();t->Init=$3;t->Cond=$5;t->Update=$7;t->Body=$9;$$=t; SavePosition;}
       | error SEMI   {$$=NULL;}
       ;
 
@@ -191,6 +195,8 @@ Exp:    Exp ASSIGN Exp {AssignAST *t=new AssignAST();t->Op=ASSIGN;
       | Exp NE Exp 	{BinaryExprAST *t=new BinaryExprAST();t->Op=NE;t->LeftExp=$1;t->RightExp=$3;$$=t;SavePosition;}
       | Exp EQ Exp 	{BinaryExprAST *t=new BinaryExprAST();t->Op=EQ;t->LeftExp=$1;t->RightExp=$3;$$=t;SavePosition;}
 
+        // TODO:
+      | Exp LB Exp RB {std::cout << "Exp LB Exp RB" << std::endl;}
 
       | DPLUS  Exp      {UnaryExprAST *t=new UnaryExprAST();t->Op=DPLUS;t->Exp=$2;$$=t;SavePosition;}    //自增、自减运算符。。。可区分前后缀形式
       | DMINUS Exp      {UnaryExprAST *t=new UnaryExprAST();t->Op=DMINUS;t->Exp=$2;$$=t;SavePosition;}
