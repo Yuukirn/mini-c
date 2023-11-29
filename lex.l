@@ -67,6 +67,26 @@ charconst \'([^'\\]|\\.)\'
 "]"     {return RB;}
 "{"	    {return LC;}
 "}"	    {return RC;}
+"/*"     {
+          char c;
+          while (c != EOF && ((c = input()) != '/')) {
+            if (c == EOF) break;
+            if (c == '\n') yylineno++;
+            while (c != EOF && ((c = input()) != '*')) {
+              if (c == EOF) break;
+              if (c == '\n') yylineno++;
+            };
+          }
+        }
+"//"    {
+          char c;
+          while (c != EOF && ((c = input()) != '\n')) {
+            continue;
+          }
+          if (c == '\n') {
+            yylineno++;
+          }
+        }
 {intconst}      { yylval.type_int=atoi(yytext); return INT;}
 {floatconst}    { yylval.type_float=atof(yytext);     return FLOAT;}
 {charconst}     { yylval.type_char=yytext[1]; return CHAR;}
