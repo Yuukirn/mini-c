@@ -30,6 +30,18 @@ extern map<int, int> TypeWidth;
 
 enum BasicTypes { T_CHAR, T_INT, T_FLOAT, T_VOID };
 
+static string TypeName(BasicTypes Type) {
+  switch (Type) {
+  case T_CHAR: return "char";
+  case T_INT:
+    return "int";
+  case T_FLOAT:
+    return "float";
+  case T_VOID:
+    return "void";
+  }
+}
+
 typedef struct {
   int Line, Column;
   string ErrMsg;
@@ -40,21 +52,23 @@ public:
   static vector<Error> Errs;
   static void ErrorAdd(int Line, int Column, string ErrMsg);
   static void ErrorsDisplay();
-  static inline bool IsEmpty() { return Errs.size() == 0; }
+  static inline bool IsEmpty() { return Errs.empty(); }
 };
 
 /**************符号表定义**********************/
 class Symbol {
 public:
   string Name;
+  // TODO: add struct?
   int Type; // 符号类型，目前仅基本类型T_CHAR,T_INT,T_FLOAT，T_VOID
   char Kind; // 符号种类：基本变量V，函数名F，参数P，数组A等
 };
 
 class VarSymbol : public Symbol {
 public:
-  string Alias; // 别名，为解决中间代码中，作用域嵌套变量同名的显示时的二义性问题
-  int Offset;   // 变量在对应AR中的偏移量
+  string
+      Alias; // 别名，为解决中间代码中，作用域嵌套变量同名的显示时的二义性问题
+  int Offset; // 变量在对应AR中的偏移量
 };
 
 class FuncSymbol : public Symbol {
@@ -64,9 +78,13 @@ public:
   SymbolsInAScope *ParamPtr; // 指向参数的符号表
 };
 
-// class AyyaySymbol:public Symbol{  //数组名
-//     public:   数组的内情向量信息
-// }
+// TODO: 和 VarSymbol 合并?
+//class ArraySymbol : public Symbol { // 数组名
+//public:                             // 数组的内情向量信息
+//  vector<int> Dims;                 // 各维大小
+//  int ARSize;                       // 数组所占空间大小
+//  SymbolsInAScope *ArrayPtr;        // 指向数组元素的符号表
+//};
 
 class SymbolsInAScope { // 单一作用域的符号名，每个复合语句对应一个符号表
 public:
@@ -76,10 +94,14 @@ public:
 class
     SymbolStackDef { // 符号表类定义,栈结构栈底为全局变量和函数定义，每个复合语句对应一张局部符号表
 public:
+  // 所有的符号表，最后一个即为当前作用域的符号表
   vector<SymbolsInAScope *> Symbols;
-  Symbol *LocateNameCurrent(string Name); // 在当前作用域中查找该符号是否有定义
+  // 只在 Symbols.back() 中查找
   Symbol *
-  LocateNameGlobal(string Name); // 由内向外，在全部作用域中查找该符号是否有定义
+  LocateNameCurrent(const string &Name); // 在当前作用域中查找该符号是否有定义
+  // 搜索全部 Symbols
+  Symbol *LocateNameGlobal(
+      const string &Name); // 由内向外，在全部作用域中查找该符号是否有定义
 };
 
 /**************中间代码（四元式）定义**********************/
@@ -127,6 +149,7 @@ public:
   static int MaxTempVarOffset; // 表达式求值时临时变量需要的最大空间
   static SymbolStackDef SymbolStack; // 符号表
 };
+
 class ProgAST : public AST { // 程序结点，程序由多个外部定义组成
 public:
   vector<ExtDefAST *> ExtDefs; // 外部定义序列
@@ -246,6 +269,7 @@ public:
   void GenIR() override;
 
   // semantic attributes
+  // 如果是函数体内的复合语句，FuncDefAST::Semantics() 会设置该字段
   SymbolsInAScope *LocalSymbolTable; // 每个复合语句对应一个作用域（局部变量）
 };
 
@@ -362,8 +386,8 @@ public:
 
 class AssignAST : public ExpAST { // 赋值表达式
 public:
-  int Op; //=，+=。。。
-  ExpAST *LeftValExp, *RightValExp;
+  int Op{}; //=，+=。。。
+  ExpAST *LeftValExp{}, *RightValExp{};
 
   void DisplayAST(int indent) override;
   void Semantics(int &Offset) override;
@@ -373,18 +397,18 @@ public:
 
 class BinaryExprAST : public ExpAST { // 二元运算符
 public:
-  int Op;
-  ExpAST *LeftExp, *RightExp;
+  int Op{};
+  ExpAST *LeftExp{}, *RightExp{};
   void DisplayAST(int indent) override;
   void Semantics(int &Offset) override;
   Opn GenIR(int &TempOffset) override;
   void GenIR(int &TempVarOffset, string LabelTrue, string LabelFalse) override;
 };
 
-class UnaryExprAST : public ExpAST { // 二元运算符
+class UnaryExprAST : public ExpAST { // 一元运算符
 public:
-  int Op;
-  ExpAST *Exp;
+  int Op{};
+  ExpAST *Exp{};
 
   void DisplayAST(int indent) override;
   void Semantics(int &Offset) override;

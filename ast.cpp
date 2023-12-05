@@ -167,7 +167,7 @@ void ForStmAST::DisplayAST(int indent) { // 显示for循环语句
   space(indent + 2);
   cout << "步长：" << endl;
   Update->DisplayAST(indent + 8);
-  
+
   space(indent + 2);
   cout << "循环体：" << endl;
   Body->DisplayAST(indent + 8);
@@ -238,6 +238,8 @@ void ConstAST::DisplayAST(int indent) { // 显示常量
     break;
   case T_FLOAT:
     cout << ConstVal.constFLOAT;
+    break;
+  case T_VOID:
     break;
   }
 }

@@ -1,7 +1,10 @@
 /*********以下程序只完成了部分静态语义检查，需自行补充完整*******************/
+#include <utility>
+
 #include "def.h"
 SymbolStackDef AST::SymbolStack = SymbolStackDef(); // 初始化静态成员符号表
 
+// TODO: 数组字节
 map<int, int> TypeWidth = {
     {T_CHAR, 1}, {T_INT, 4}, {T_FLOAT, 8}}; // 各类型所占字节数
 map<char, string> KindName = {
@@ -9,11 +12,11 @@ map<char, string> KindName = {
 
 vector<Error> Errors::Errs = {};
 void Errors::ErrorAdd(int Line, int Column, string ErrMsg) {
-  Error e = {Line, Column, ErrMsg};
+  Error e = {Line, Column, std::move(ErrMsg)};
   Errs.push_back(e);
 }
 void Errors::ErrorsDisplay() {
-  for (auto a : Errs)
+  for (const auto &a : Errs)
     cout << "第" << a.Line << "行、第" << a.Column << "列处错误: " << a.ErrMsg
          << endl;
 }
@@ -22,6 +25,7 @@ string NewAlias() {
   static int num = 0;
   return "V_" + to_string(++num);
 }
+
 void DisplaySymbolTable(SymbolStackDef *SYM) {
   for (int i = 0; i < SYM->Symbols.size(); i++) {
     cout << "------------------------------------------------------------------"
@@ -32,12 +36,11 @@ void DisplaySymbolTable(SymbolStackDef *SYM) {
     cout << "------------------------------------------------------------------"
             "----"
          << endl;
-    if (SYM->Symbols.at(i)->Symbols.size() == 0)
+    if (SYM->Symbols.at(i)->Symbols.empty())
       cout << "  空 表" << endl;
     else
-      for (int j = 0; j < SYM->Symbols.at(i)->Symbols.size(); j++) {
-        Symbol *SymPtr =
-            SYM->Symbols.at(i)->Symbols.at(j); // 取第i层第j个符号对象的指针
+      for (auto SymPtr : SYM->Symbols.at(i)->Symbols) {
+        // 取第i层第j个符号对象的指针
         cout.width(20);
         cout << SymPtr->Name;
         cout.width(8);
@@ -56,8 +59,10 @@ void DisplaySymbolTable(SymbolStackDef *SYM) {
         {
           cout << "形参数: " << ((FuncSymbol *)SymPtr)->ParamNum;
           cout << "  变量空间: " << ((FuncSymbol *)SymPtr)->ARSize;
-        } else if (SymPtr->Kind == 'A')
-          ; // 符号是数组，需要显示各维大小
+        } else if (SymPtr->Kind == 'A') {
+          // 符号是数组，需要显示各维大小
+          // TODO:
+        }
         cout << endl;
       }
     cout << "------------------------------------------------------------------"
@@ -72,22 +77,22 @@ bool IsLeftValue(ExpAST *PExp) {
 }
 
 Symbol *SymbolStackDef::LocateNameCurrent(
-    string Name) // 在当前(最内层)作用域中查找该符号是否有定义
+    const string &Name) // 在当前(最内层)作用域中查找该符号是否有定义
 {
   SymbolsInAScope *curScope = Symbols.back();
-  for (int i = 0; i < curScope->Symbols.size(); i++)
-    if (curScope->Symbols.at(i)->Name == Name)
-      return curScope->Symbols.at(i);
+  for (auto &Symbol : curScope->Symbols)
+    if (Symbol->Name == Name)
+      return Symbol;
   return nullptr;
 }
 
 Symbol *SymbolStackDef::LocateNameGlobal(
-    string Name) // 由内向外，整个符号表中查找该符号是否有定义
-{
-  for (int i = Symbols.size() - 1; i >= 0; i--) {
-    for (int j = 0; j < Symbols.at(i)->Symbols.size(); j++)
-      if (Symbols.at(i)->Symbols.at(j)->Name == Name)
-        return Symbols.at(i)->Symbols.at(j);
+    const string &Name) {
+  // 由内向外，整个符号表中查找该符号是否有定义
+  for (int i = static_cast<int>(Symbols.size() - 1); i >= 0; i--) {
+    for (auto &Symbol : Symbols.at(i)->Symbols)
+      if (Symbol->Name == Name)
+        return Symbol;
   }
   return nullptr;
 }
@@ -99,13 +104,15 @@ void ProgAST::Semantics0() {
 }
 
 void ProgAST::Semantics(int &Offset) {
-  SymbolsInAScope *Global =
+  // 全局作用域
+  auto *Global =
       new SymbolsInAScope(); // 全局变量的作用域符号表，记录外部变量、函数名
   SymbolStack.Symbols.push_back(Global);
   GlobalSymbolTable = Global; // 程序对象挂一个全局符号表
 
   // 预先设置缺省函数read和write
-  FuncSymbol *FuncDefPtr = new FuncSymbol();
+  // 内置函数 read、write
+  auto *FuncDefPtr = new FuncSymbol();
   FuncDefPtr->Name = string("read");
   FuncDefPtr->Type = T_INT;
   FuncDefPtr->Kind = 'F';
@@ -120,121 +127,142 @@ void ProgAST::Semantics(int &Offset) {
   FuncDefPtr->ARSize = 4;
   SymbolStack.Symbols.back()->Symbols.push_back(FuncDefPtr);
 
-  VarSymbol *VarDefPtr = new VarSymbol();
+  // write 的参数
+  auto *VarDefPtr = new VarSymbol();
   VarDefPtr->Name = VarDefPtr->Alias = string("x");
   VarDefPtr->Type = T_INT;
   VarDefPtr->Kind = 'P';
   VarDefPtr->Offset = 4;
   SymbolStack.Symbols.back()->Symbols.push_back(VarDefPtr);
 
+  // 对所有节点做语义分析
   for (auto a : ExtDefs) {
     a->Semantics(Offset);
   }
+
+  // 打印符号表
   DisplaySymbolTable(&SymbolStack);
 }
 
 void ExtVarDefAST::Semantics(int &Offset) // 外部定义对象的语义
 {
   for (auto a : ExtVars)
+    // a: VarDecAST
     a->Semantics(Offset, Type);
 }
 
 void VarDecAST::Semantics(int &Offset, TypeAST *Type) {
-  if (!SymbolStack.LocateNameCurrent(
-          Name)) // 当前作用域未定义，将变量加入符号表
-  {
+  if (!SymbolStack.LocateNameCurrent(Name)) {
+    // 当前作用域未定义，将变量加入符号表
     VarDefPtr = new VarSymbol();
     VarDefPtr->Name = Name;
     VarDefPtr->Alias = NewAlias();
-    if (!Dims.size())
+
+    if (Dims.empty()) {
+      // var
       VarDefPtr->Kind = 'V';
-    else
+    } else {
+      // array
       VarDefPtr->Kind = 'A';
-    if (typeid(*Type) == typeid(BasicTypeAST))
-      VarDefPtr->Type = ((BasicTypeAST *)Type)->Type;
+    }
+    if (typeid(*Type) == typeid(BasicTypeAST)) {
+      VarDefPtr->Type = (dynamic_cast<BasicTypeAST *>(Type))->Type;
+    }
+
+    // 设置并增加 offset
     VarDefPtr->Offset = Offset;
     Offset += TypeWidth[VarDefPtr->Type];
-    if (Exp) // 有初值表达式时的处理
+
+    if (Exp) {
+      // 有初值表达式时的处理
       Exp->Semantics(Offset);
+    }
     SymbolStack.Symbols.back()->Symbols.push_back(VarDefPtr);
-  } else
+  } else {
     Errors::ErrorAdd(Line, Column, "变量 " + Name + " 重复定义");
+  }
 }
 
 void DefAST::Semantics(int &Offset) { // 依次提取变量符号进行语义分析
-  for (auto a : LocVars)
+  for (auto a : LocVars) {
     a->Semantics(Offset, Type);
+  }
 }
 
 void BasicTypeAST::Semantics(int &Offset) {}
 
 void FuncDefAST::Semantics(int &Offset) {
-  if (!SymbolStack.LocateNameCurrent(
-          Name)) // 当前作用域未定义，将变量加入符号表
-  {
-    int Offset =
+  if (!SymbolStack.LocateNameCurrent(Name)) {
+    // 当前作用域未定义，将变量加入符号表
+    // TODO: 覆盖？
+    int offset =
         12; // 局部变量偏移量初始化,预留12个字节存放返回地址等信息，可根据实际情况修改
     MaxVarSize = 12; // 计算函数变量需要的最大容量
     FuncDefPtr = new FuncSymbol();
     FuncDefPtr->Name = Name;
     FuncDefPtr->Kind = 'F';
-    if (typeid(*Type) ==
-        typeid(
-            BasicTypeAST)) // 处理符号项的返回类型，目前仅基本类型T_CHAR,T_INT,T_FLOAT
-      FuncDefPtr->Type = ((BasicTypeAST *)Type)->Type;
-    FuncDefPtr->ParamNum = Params.size();
+    if (typeid(*Type) == typeid(BasicTypeAST)) {
+      // 处理符号项的返回类型，目前仅基本类型T_CHAR,T_INT,T_FLOAT
+      FuncDefPtr->Type = (dynamic_cast<BasicTypeAST *>(Type))->Type;
+    }
+    FuncDefPtr->ParamNum = static_cast<int>(Params.size());
 
-    SymbolsInAScope *Local = new SymbolsInAScope(); // 生成函数体作用域变量表
-    FuncDefPtr->ParamPtr = Local; // 函数符号表项，指向形参
+    auto Local = new SymbolsInAScope(); // 生成函数体作用域变量表
+    FuncDefPtr->ParamPtr = Local;        // 函数符号表项，指向形参
     SymbolStack.Symbols.back()->Symbols.push_back(
         FuncDefPtr); // 填写函数符号到符号表
 
     SymbolStack.Symbols.push_back(Local); // 函数体符号表（含形参）进栈
     Body->LocalSymbolTable = Local;
     for (auto a : Params)
-      a->Semantics(Offset); // 未考虑参数用寄存器，只是简单在AR中分配单元
-    Body->Semantics(Offset); // 对函数中的变量，在AR中接在参数后分配单元
+      a->Semantics(offset); // 未考虑参数用寄存器，只是简单在AR中分配单元
+    Body->Semantics(offset); // 对函数中的变量，在AR中接在参数后分配单元
     FuncDefPtr->ARSize =
         MaxVarSize; // 函数变量需要空间大小（未考虑临时变量），后续再加临时变量单元得到AR大小
-  } else
+  } else {
     Errors::ErrorAdd(Line, Column, "函数 " + Name + " 重复定义");
+  }
 }
+
 void ParamAST::Semantics(int &Offset) {
-  if (!SymbolStack.LocateNameCurrent(
-          ParamName->Name)) // 当前作用域未重复定义，将形参名加入符号表
-  {
-    VarSymbol *SymPtr = new VarSymbol();
+  if (!SymbolStack.LocateNameCurrent(ParamName->Name)) {
+    // 当前作用域未重复定义，将形参名加入符号表
+    auto *SymPtr = new VarSymbol();
     SymPtr->Name = ParamName->Name;
     SymPtr->Kind = 'P';
     SymPtr->Alias = NewAlias();
     if (typeid(*Type) == typeid(BasicTypeAST))
-      SymPtr->Type = ((BasicTypeAST *)Type)->Type;
+      SymPtr->Type = (dynamic_cast<BasicTypeAST *>(Type))->Type;
     SymPtr->Offset = Offset;
     Offset += TypeWidth[SymPtr->Type];
     SymbolStack.Symbols.back()->Symbols.push_back(SymPtr);
-  } else
+  } else {
     Errors::ErrorAdd(Line, Column, "形参名 " + ParamName->Name + " 重复定义");
+  }
 }
 
 /**************语句显示******************************/
 void CompStmAST::Semantics(int &Offset) {
-  if (!LocalSymbolTable) // 如果不是函数体的复合语句，需自行生成局部符号表
-  {
-    SymbolsInAScope *Local =
+  if (!LocalSymbolTable) {
+    // 如果不是函数体的复合语句，需自行生成局部符号表
+    auto Local =
         new SymbolsInAScope(); // 全局变量的作用域符号表，记录外部变量、函数名
     SymbolStack.Symbols.push_back(Local);
     LocalSymbolTable = Local; // 程序对象挂一个符号表
   }
-  for (auto a : Decls)
+  for (auto a : Decls) {
     a->Semantics(Offset);
-  if (Offset > MaxVarSize)
+  }
+  if (Offset > MaxVarSize) {
     MaxVarSize = Offset;
+  }
   for (auto a : Stms) {
     int Offset_S =
         Offset; // 前后并列语句可以使用同一片单元，所以取最大值，这里保存起始偏移量
     a->Semantics(Offset);
-    if (Offset > MaxVarSize)
+    if (Offset > MaxVarSize) {
       MaxVarSize = Offset;
+    }
     Offset = Offset_S;
   }
   cout << "\n\n********************当前复合语句符号表状态**********************"
@@ -274,15 +302,24 @@ void ContinueStmAST::Semantics(int &Offset) {}
 
 /**************表达式显示******************************/
 void VarAST::Semantics(int &Offset) {
-  if (VarRef = (VarSymbol *)SymbolStack.LocateNameGlobal(Name)) {
+  auto symbol = SymbolStack.LocateNameGlobal(Name);
+  if (symbol->Kind == 'F') {
     // 如果是函数名，报错，
+    Errors::ErrorAdd(Line, Column, "对函数名采用非函数调用形式访问 " + Name);
+    return;
+  }
+  VarRef = reinterpret_cast<VarSymbol *>(symbol);
+  if (VarRef) {
     // 简单变量则提取变量类型属性
-  } else
+    Type = static_cast<BasicTypes>(VarRef->Type);
+  } else {
     Errors::ErrorAdd(Line, Column, "引用未定义的符号 " + Name);
+  }
 }
 
 void ConstAST::Semantics(int &Offset) {
   // 提取类型属性
+  // const 类型在词法解析时便确定
 }
 
 void AssignAST::Semantics(int &Offset) {
@@ -295,18 +332,46 @@ void AssignAST::Semantics(int &Offset) {
 void BinaryExprAST::Semantics(int &Offset) {
   LeftExp->Semantics(Offset);
   RightExp->Semantics(Offset);
-  // 根据左右值类型，判断是否能进行运算，并确定运算结果类型
+  if (LeftExp->Type == T_VOID || RightExp->Type == T_VOID) {
+        Errors::ErrorAdd(Line, Column, "void类型不能参与运算");
+        return;
+  }
+  // 判断左右值类型是否一致
+  if (LeftExp->Type != RightExp->Type) {
+    Errors::ErrorAdd(Line, Column, "类型不匹配 " + TypeName(LeftExp->Type) +
+                                        " " + TypeName(RightExp->Type));
+    return;
+  }
+  // 确定运算结果
+  Type = LeftExp->Type;
 }
 
 void UnaryExprAST::Semantics(int &Offset) { Exp->Semantics(Offset); }
 
 void FuncCallAST::Semantics(int &Offset) {
-
-  if (FuncRef = (FuncSymbol *)SymbolStack.LocateNameGlobal(Name)) {
-    for (auto a : Params) {
-      // 检查实参表达式个数和形参数是否一致，类型是否一致
-      a->Semantics(Offset);
+  auto symbol = SymbolStack.LocateNameGlobal(Name);
+  if (symbol->Kind != 'F') {
+    Errors::ErrorAdd(Line, Column, "对非函数名采用函数调用形式 " + Name);
+    return;
+  }
+  FuncRef = reinterpret_cast<FuncSymbol *>(symbol);
+  if (FuncRef) {
+    // 检查实参表达式个数和形参数是否一致
+    if (FuncRef->ParamNum != static_cast<int>(Params.size())) {
+      Errors::ErrorAdd(Line, Column, "函数 " + Name + " 参数个数不匹配");
+      return;
     }
-  } else
+
+    auto paramSymbols = FuncRef->ParamPtr->Symbols;
+    for (int i = 0; i < static_cast<int>(Params.size()); i++) {
+      // 检查类型是否一致
+      if (Params[i]->Type != paramSymbols[i]->Type) {
+        Errors::ErrorAdd(Line, Column, "函数 " + Name + " 参数类型不匹配");
+        return;
+      }
+      Params[i]->Semantics(Offset);
+    }
+  } else {
     Errors::ErrorAdd(Line, Column, "引用未定义的函数 " + Name);
+  }
 }
