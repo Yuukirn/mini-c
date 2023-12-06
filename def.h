@@ -294,6 +294,7 @@ public:
   void Semantics(int &Offset) override;
   void GenIR() override;
 };
+
 class IfElseStmAST : public StmAST { // 条件语句if-then-else
 public:
   ExpAST *Cond{};

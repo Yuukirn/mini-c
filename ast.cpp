@@ -16,7 +16,7 @@ map<int, string> SymbolMap = {
     {GT, ">"},        {GE, ">="},     {LT, "<"},          {LE, "<="},
     {EQ, "=="},       {NE, "!="},     {PLUS, "+"},        {MINUS, "-"},
     {UPLUS, "*"},     {UMINUS, "/"},  {ASSIGN, "="},      {AND, "&&"},
-    {OR, "||"},       {NOT, "!"}};
+    {OR, "||"},       {NOT, "!"},    {DMINUS, "--"},     {DPLUS, "++"}};
 void ProgAST::DisplayAST(
     int indent) { // 依次显示向量ExtDefs中的各个外部定义(外部变量定义和函数定义)
   for (auto a : ExtDefs)

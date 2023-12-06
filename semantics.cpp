@@ -1,5 +1,6 @@
 /*********以下程序只完成了部分静态语义检查，需自行补充完整*******************/
 #include <utility>
+#include "parser.tab.hpp"
 
 #include "def.h"
 SymbolStackDef AST::SymbolStack = SymbolStackDef(); // 初始化静态成员符号表
@@ -70,15 +71,21 @@ void DisplaySymbolTable(SymbolStackDef *SYM) {
          << endl;
   }
 }
+
 bool IsLeftValue(ExpAST *PExp) {
-  if (typeid(*PExp) == typeid(VarAST))
-    return true; // 对简单变量、数组下标变量，结构变量,需要查符号表
+  if (typeid(*PExp) == typeid(VarAST)) {
+    return true;
+  }
+  if (typeid(*PExp) == typeid(ArrayIndexAST)) {
+    // 数组下标表达式
+    return true;
+  }
   return false;
 }
 
 Symbol *SymbolStackDef::LocateNameCurrent(
-    const string &Name) // 在当前(最内层)作用域中查找该符号是否有定义
-{
+    const string &Name) {
+  // 在当前(最内层)作用域中查找该符号是否有定义
   SymbolsInAScope *curScope = Symbols.back();
   for (auto &Symbol : curScope->Symbols)
     if (Symbol->Name == Name)
@@ -111,7 +118,7 @@ void ProgAST::Semantics(int &Offset) {
 
   // 预先设置缺省函数read和write
   // 内置函数 read、write
-  auto *FuncDefPtr = new FuncSymbol();
+  auto FuncDefPtr = new FuncSymbol();
   FuncDefPtr->Name = string("read");
   FuncDefPtr->Type = T_INT;
   FuncDefPtr->Kind = 'F';
@@ -197,7 +204,6 @@ void BasicTypeAST::Semantics(int &Offset) {}
 void FuncDefAST::Semantics(int &Offset) {
   if (!SymbolStack.LocateNameCurrent(Name)) {
     // 当前作用域未定义，将变量加入符号表
-    // TODO: 覆盖？
     int offset =
         12; // 局部变量偏移量初始化,预留12个字节存放返回地址等信息，可根据实际情况修改
     MaxVarSize = 12; // 计算函数变量需要的最大容量
@@ -217,8 +223,23 @@ void FuncDefAST::Semantics(int &Offset) {
 
     SymbolStack.Symbols.push_back(Local); // 函数体符号表（含形参）进栈
     Body->LocalSymbolTable = Local;
-    for (auto a : Params)
+    for (auto a : Params) {
       a->Semantics(offset); // 未考虑参数用寄存器，只是简单在AR中分配单元
+    }
+
+    // 检查是否有 return 语句
+    bool hasReturn = false;
+    for (auto stm : Body->Stms) {
+      if (typeid(*stm) == typeid(ReturnStmAST)) {
+        hasReturn = true;
+        break;
+      }
+    }
+    if (!hasReturn && FuncDefPtr->Type != T_VOID) {
+      Errors::ErrorAdd(Line, Column, "函数 " + Name + " 没有返回语句");
+      return;
+    }
+
     Body->Semantics(offset); // 对函数中的变量，在AR中接在参数后分配单元
     FuncDefPtr->ARSize =
         MaxVarSize; // 函数变量需要空间大小（未考虑临时变量），后续再加临时变量单元得到AR大小
@@ -333,8 +354,9 @@ void ConstAST::Semantics(int &Offset) {
 
 void AssignAST::Semantics(int &Offset) {
   LeftValExp->Semantics(Offset);
-  if (!IsLeftValue(LeftValExp))
+  if (!IsLeftValue(LeftValExp)) {
     Errors::ErrorAdd(Line, Column, "非左值表达式");
+  }
   RightValExp->Semantics(Offset);
 }
 
@@ -356,7 +378,16 @@ void BinaryExprAST::Semantics(int &Offset) {
   Type = LeftExp->Type;
 }
 
-void UnaryExprAST::Semantics(int &Offset) { Exp->Semantics(Offset); }
+void UnaryExprAST::Semantics(int &Offset) {
+  if (Op == DMINUS || Op == DPLUS) {
+    // 单目运算符++、--
+    if (!IsLeftValue(Exp)) {
+      Errors::ErrorAdd(Line, Column, "非左值表达式");
+      return;
+    }
+  }
+  Exp->Semantics(Offset);
+}
 
 void FuncCallAST::Semantics(int &Offset) {
   auto symbol = SymbolStack.LocateNameGlobal(Name);
@@ -371,6 +402,8 @@ void FuncCallAST::Semantics(int &Offset) {
   }
   FuncRef = reinterpret_cast<FuncSymbol *>(symbol);
   if (FuncRef) {
+    Type = static_cast<BasicTypes>(FuncRef->Type);
+
     // 检查实参表达式个数和形参数是否一致
     if (FuncRef->ParamNum != static_cast<int>(Params.size())) {
       Errors::ErrorAdd(Line, Column, "函数 " + Name + " 参数个数不匹配");
