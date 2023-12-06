@@ -8,6 +8,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 using namespace std;
@@ -32,7 +33,8 @@ enum BasicTypes { T_CHAR, T_INT, T_FLOAT, T_VOID };
 
 static string TypeName(BasicTypes Type) {
   switch (Type) {
-  case T_CHAR: return "char";
+  case T_CHAR:
+    return "char";
   case T_INT:
     return "int";
   case T_FLOAT:
@@ -73,14 +75,14 @@ public:
 
 class FuncSymbol : public Symbol {
 public:
-  int ARSize;   // 函数AR的大小，作为调用时分配单元的依据
-  int ParamNum; // 形式参数个数
-  SymbolsInAScope *ParamPtr; // 指向参数的符号表
+  int ARSize{};   // 函数AR的大小，作为调用时分配单元的依据
+  int ParamNum{}; // 形式参数个数
+  SymbolsInAScope *ParamPtr{}; // 指向参数的符号表
 };
 
 // TODO: 和 VarSymbol 合并?
-//class ArraySymbol : public Symbol { // 数组名
-//public:                             // 数组的内情向量信息
+// class ArraySymbol : public Symbol { // 数组名
+// public:                             // 数组的内情向量信息
 //  vector<int> Dims;                 // 各维大小
 //  int ARSize;                       // 数组所占空间大小
 //  SymbolsInAScope *ArrayPtr;        // 指向数组元素的符号表
@@ -108,9 +110,9 @@ public:
 class Opn {
 public:
   string Name; // 变量别名（为空时表示常量）或函数名
-  int Type;
+  int Type{};
   union {
-    int Offset;   // AR中的偏移量
+    int Offset{}; // AR中的偏移量
     void *SymPtr; // 符号表指针
     char constCHAR;
     int constINT;
@@ -118,12 +120,12 @@ public:
   };
 
   Opn(string Name, int Type, int Offset)
-      : Name(Name), Type(Type), Offset(Offset){};
+      : Name(std::move(Name)), Type(Type), Offset(Offset){};
   Opn(){};
 };
 
-class IRCode // 四元式结构
-{
+// 四元式结构
+class IRCode {
 public:
   int Op;
   Opn Opn1;
@@ -131,7 +133,8 @@ public:
   Opn Result;
 
   IRCode(int Op, Opn Opn1, Opn Opn2, Opn Result)
-      : Op(Op), Opn1(Opn1), Opn2(Opn2), Result(Result) {}
+      : Op(Op), Opn1(std::move(Opn1)), Opn2(std::move(Opn2)),
+        Result(std::move(Result)) {}
 };
 
 /**************抽象语法树结点类型定义**********************/
@@ -180,21 +183,21 @@ class TypeAST : public AST {};
 
 class BasicTypeAST : public TypeAST { // 用对象存储基本数据类型
 public:
-  BasicTypes Type;
+  BasicTypes Type{};
 
   void DisplayAST(int indent) override;
   void Semantics(int &Offset) override;
   void GenIR() override;
 };
 
-class StructTypeAST : public TypeAST { // 结构类型名
-public:
-  string Name;
-
-  void DisplayAST(int indent) override;
-  void Semantics(int &Offset) override;
-  void GenIR() override;
-};
+//class StructTypeAST : public TypeAST { // 结构类型名
+//public:
+//  string Name;
+//
+//  void DisplayAST(int indent) override;
+//  void Semantics(int &Offset) override;
+//  void GenIR() override;
+//};
 
 // class StructDefAST:public TypeAST{//结构类型名
 // public:
@@ -238,8 +241,8 @@ public:
 
 class ParamAST : public AST { // 形参
 public:
-  TypeAST *Type;        // 形参类型
-  VarDecAST *ParamName; // 形参名，这里考虑到形参是数组的扩展
+  TypeAST *Type{};        // 形参类型
+  VarDecAST *ParamName{}; // 形参名，这里考虑到形参是数组的扩展
 
   void DisplayAST(int indent) override;
   void Semantics(int &Offset) override;
@@ -275,7 +278,7 @@ public:
 
 class ExprStmAST : public StmAST { // 表达式语句
 public:
-  ExpAST *Exp;
+  ExpAST *Exp{};
 
   void DisplayAST(int l) override;
   void Semantics(int &Offset) override;
@@ -284,8 +287,8 @@ public:
 
 class IfStmAST : public StmAST { // 条件语句if-then
 public:
-  ExpAST *Cond;
-  StmAST *ThenStm;
+  ExpAST *Cond{};
+  StmAST *ThenStm{};
 
   void DisplayAST(int l) override;
   void Semantics(int &Offset) override;
@@ -293,9 +296,9 @@ public:
 };
 class IfElseStmAST : public StmAST { // 条件语句if-then-else
 public:
-  ExpAST *Cond;
-  StmAST *ThenStm;
-  StmAST *ElseStm;
+  ExpAST *Cond{};
+  StmAST *ThenStm{};
+  StmAST *ElseStm{};
 
   void DisplayAST(int l) override;
   void Semantics(int &Offset) override;
@@ -304,8 +307,8 @@ public:
 
 class WhileStmAST : public StmAST { // while语句
 public:
-  ExpAST *Cond;
-  StmAST *Body;
+  ExpAST *Cond{};
+  StmAST *Body{};
 
   void DisplayAST(int l) override;
   void Semantics(int &Offset) override;
@@ -314,10 +317,10 @@ public:
 
 class ForStmAST : public StmAST { // for
 public:
-  ExpAST *Init;
-  ExpAST *Cond;
-  ExpAST *Update;
-  StmAST *Body;
+  ExpAST *Init{};
+  ExpAST *Cond{};
+  ExpAST *Update{};
+  StmAST *Body{};
 
   void DisplayAST(int l) override;
   void Semantics(int &Offset) override;
@@ -326,7 +329,7 @@ public:
 
 class ReturnStmAST : public StmAST { // 表达式语句
 public:
-  ExpAST *Exp;
+  ExpAST *Exp{};
 
   void DisplayAST(int l) override;
   void Semantics(int &Offset) override;
@@ -358,13 +361,14 @@ public:
   } // 布尔表达式生成短路语句
 };
 
+// 常数
 class ConstAST : public ExpAST {
 public:
   union ConstVal {
     char constCHAR;
     int constINT;
     float constFLOAT;
-  } ConstVal;
+  } ConstVal{};
 
   void DisplayAST(int indent) override;
   void Semantics(int &Offset) override;
@@ -421,6 +425,17 @@ public:
   string Name;             // 函数名
   vector<ExpAST *> Params; // 实际参数表达式序列
   FuncSymbol *FuncRef;     // 指向该函数对应的符号表项
+
+  void DisplayAST(int indent) override;
+  void Semantics(int &Offset) override;
+  Opn GenIR(int &TempOffset) override;
+  void GenIR(int &TempVarOffset, string LabelTrue, string LabelFalse) override;
+};
+
+class ArrayIndexAST : public ExpAST { // 数组下标取值
+public:
+  ExpAST *Pre{}; // type: ArrayIndexAST | VarAST
+  ExpAST *Index{};
 
   void DisplayAST(int indent) override;
   void Semantics(int &Offset) override;

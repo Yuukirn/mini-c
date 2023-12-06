@@ -466,3 +466,12 @@ void FuncCallAST::GenIR(int &TempVarOffset, string LabelTrue,
                         string LabelFalse) {
   // 根据函数返回值确定转移方向
 }
+
+Opn ArrayIndexAST::GenIR(int &TempOffset) {
+  // TODO: implement me
+  return Opn{};
+}
+
+void ArrayIndexAST::GenIR(int &TempVarOffset, std::string LabelTrue, std::string LabelFalse) {
+  // TODO: implement me
+}

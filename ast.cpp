@@ -49,9 +49,11 @@ void VarDecAST::DisplayAST(int indent) { // 显示外部变量定义中的单个
     cout << "= ";
     if (typeid(*Exp) == typeid(BinaryExprAST)) {
       cout << SymbolMap[((BinaryExprAST *)Exp)->Op] << endl;
-      ((BinaryExprAST *)Exp)->LeftExp->DisplayAST(indent + Name.length() + 5);
+      (dynamic_cast<BinaryExprAST *>(Exp))
+          ->LeftExp->DisplayAST(indent + static_cast<int>(Name.length()) + 5);
       cout << endl;
-      ((BinaryExprAST *)Exp)->RightExp->DisplayAST(indent + Name.length() + 5);
+      (dynamic_cast<BinaryExprAST *>(Exp))
+          ->RightExp->DisplayAST(indent + static_cast<int>(Name.length()) + 5);
     } else
       Exp->DisplayAST(0);
   }
@@ -64,7 +66,7 @@ void FuncDefAST::DisplayAST(int indent) { // 显示函数定义
   Type->DisplayAST(indent);
   cout << endl << "    函 数 名：" << Name << endl; // 显示函数名
   cout << "    形 参 表：";                         // 显示形参
-  if (!Params.size())
+  if (Params.empty())
     cout << "无" << endl;
   else {
     cout << endl;
@@ -89,13 +91,13 @@ void CompStmAST::DisplayAST(int indent) { // 显示复合语句
     cout << "复合语句：" << endl;
   else
     indent = 8; // 显示函数体
-  if (Decls.size()) {
+  if (!Decls.empty()) {
     space(indent + 2);
     cout << "说明部分:" << endl;
     for (auto a : Decls)
       a->DisplayAST(indent + 4);
   }
-  if (Stms.size()) {
+  if (!Stms.empty()) {
     space(indent + 2);
     cout << "语句部分:" << endl;
     for (auto a : Stms)
@@ -253,7 +255,7 @@ void FuncCallAST::DisplayAST(int indent) { // 显示函数调用
   cout << "函数调用: ";
   //    space(indent+4);
   cout << "函数名：" << Name;
-  if (!Params.size()) {
+  if (Params.empty()) {
     cout << " <无实参表达式>" << endl;
     return;
   }
@@ -269,4 +271,11 @@ void UnaryExprAST::DisplayAST(int indent) { // 显示单目运算
   space(indent);
   cout << "单目：" << SymbolMap[Op] << endl;
   Exp->DisplayAST(indent + 8);
+}
+
+void ArrayIndexAST::DisplayAST(int indent) {
+  space(indent);
+  cout << "数组下标取值：" << endl;
+  Pre->DisplayAST(indent + 4);
+  Index->DisplayAST(indent + 4);
 }

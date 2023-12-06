@@ -195,8 +195,7 @@ Exp:    Exp ASSIGN Exp {AssignAST *t=new AssignAST();t->Op=ASSIGN;
       | Exp NE Exp 	{BinaryExprAST *t=new BinaryExprAST();t->Op=NE;t->LeftExp=$1;t->RightExp=$3;$$=t;SavePosition;}
       | Exp EQ Exp 	{BinaryExprAST *t=new BinaryExprAST();t->Op=EQ;t->LeftExp=$1;t->RightExp=$3;$$=t;SavePosition;}
 
-        // TODO:
-      | Exp LB Exp RB {std::cout << "Exp LB Exp RB" << std::endl;}
+      | Exp LB Exp RB {ArrayIndexAST *t=new ArrayIndexAST();t->Pre=$1;t->Index=$3;$$=t;SavePosition;}  //数组下标取值
 
       | DPLUS  Exp      {UnaryExprAST *t=new UnaryExprAST();t->Op=DPLUS;t->Exp=$2;$$=t;SavePosition;}    //自增、自减运算符。。。可区分前后缀形式
       | DMINUS Exp      {UnaryExprAST *t=new UnaryExprAST();t->Op=DMINUS;t->Exp=$2;$$=t;SavePosition;}

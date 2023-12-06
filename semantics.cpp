@@ -86,8 +86,7 @@ Symbol *SymbolStackDef::LocateNameCurrent(
   return nullptr;
 }
 
-Symbol *SymbolStackDef::LocateNameGlobal(
-    const string &Name) {
+Symbol *SymbolStackDef::LocateNameGlobal(const string &Name) {
   // 由内向外，整个符号表中查找该符号是否有定义
   for (int i = static_cast<int>(Symbols.size() - 1); i >= 0; i--) {
     for (auto &Symbol : Symbols.at(i)->Symbols)
@@ -125,15 +124,18 @@ void ProgAST::Semantics(int &Offset) {
   FuncDefPtr->Kind = 'F';
   FuncDefPtr->ParamNum = 1;
   FuncDefPtr->ARSize = 4;
-  SymbolStack.Symbols.back()->Symbols.push_back(FuncDefPtr);
 
   // write 的参数
-  auto *VarDefPtr = new VarSymbol();
+  auto VarDefPtr = new VarSymbol();
   VarDefPtr->Name = VarDefPtr->Alias = string("x");
   VarDefPtr->Type = T_INT;
   VarDefPtr->Kind = 'P';
   VarDefPtr->Offset = 4;
   SymbolStack.Symbols.back()->Symbols.push_back(VarDefPtr);
+
+  FuncDefPtr->ParamPtr = new SymbolsInAScope();
+  FuncDefPtr->ParamPtr->Symbols.emplace_back(VarDefPtr);
+  SymbolStack.Symbols.back()->Symbols.push_back(FuncDefPtr);
 
   // 对所有节点做语义分析
   for (auto a : ExtDefs) {
@@ -146,9 +148,10 @@ void ProgAST::Semantics(int &Offset) {
 
 void ExtVarDefAST::Semantics(int &Offset) // 外部定义对象的语义
 {
-  for (auto a : ExtVars)
+  for (auto a : ExtVars) {
     // a: VarDecAST
     a->Semantics(Offset, Type);
+  }
 }
 
 void VarDecAST::Semantics(int &Offset, TypeAST *Type) {
@@ -208,7 +211,7 @@ void FuncDefAST::Semantics(int &Offset) {
     FuncDefPtr->ParamNum = static_cast<int>(Params.size());
 
     auto Local = new SymbolsInAScope(); // 生成函数体作用域变量表
-    FuncDefPtr->ParamPtr = Local;        // 函数符号表项，指向形参
+    FuncDefPtr->ParamPtr = Local;       // 函数符号表项，指向形参
     SymbolStack.Symbols.back()->Symbols.push_back(
         FuncDefPtr); // 填写函数符号到符号表
 
@@ -231,8 +234,9 @@ void ParamAST::Semantics(int &Offset) {
     SymPtr->Name = ParamName->Name;
     SymPtr->Kind = 'P';
     SymPtr->Alias = NewAlias();
-    if (typeid(*Type) == typeid(BasicTypeAST))
+    if (typeid(*Type) == typeid(BasicTypeAST)) {
       SymPtr->Type = (dynamic_cast<BasicTypeAST *>(Type))->Type;
+    }
     SymPtr->Offset = Offset;
     Offset += TypeWidth[SymPtr->Type];
     SymbolStack.Symbols.back()->Symbols.push_back(SymPtr);
@@ -303,6 +307,11 @@ void ContinueStmAST::Semantics(int &Offset) {}
 /**************表达式显示******************************/
 void VarAST::Semantics(int &Offset) {
   auto symbol = SymbolStack.LocateNameGlobal(Name);
+  if (!symbol) {
+    // 未定义的符号
+    Errors::ErrorAdd(Line, Column, "引用未定义的符号 " + Name);
+    return;
+  }
   if (symbol->Kind == 'F') {
     // 如果是函数名，报错，
     Errors::ErrorAdd(Line, Column, "对函数名采用非函数调用形式访问 " + Name);
@@ -333,13 +342,14 @@ void BinaryExprAST::Semantics(int &Offset) {
   LeftExp->Semantics(Offset);
   RightExp->Semantics(Offset);
   if (LeftExp->Type == T_VOID || RightExp->Type == T_VOID) {
-        Errors::ErrorAdd(Line, Column, "void类型不能参与运算");
-        return;
+    Errors::ErrorAdd(Line, Column, "void类型不能参与运算");
+    return;
   }
   // 判断左右值类型是否一致
   if (LeftExp->Type != RightExp->Type) {
-    Errors::ErrorAdd(Line, Column, "类型不匹配 " + TypeName(LeftExp->Type) +
-                                        " " + TypeName(RightExp->Type));
+    Errors::ErrorAdd(Line, Column,
+                     "类型不匹配 " + TypeName(LeftExp->Type) + " " +
+                         TypeName(RightExp->Type));
     return;
   }
   // 确定运算结果
@@ -350,6 +360,11 @@ void UnaryExprAST::Semantics(int &Offset) { Exp->Semantics(Offset); }
 
 void FuncCallAST::Semantics(int &Offset) {
   auto symbol = SymbolStack.LocateNameGlobal(Name);
+  if (!symbol) {
+    // 未定义的符号
+    Errors::ErrorAdd(Line, Column, "引用未定义的函数 " + Name);
+    return;
+  }
   if (symbol->Kind != 'F') {
     Errors::ErrorAdd(Line, Column, "对非函数名采用函数调用形式 " + Name);
     return;
@@ -359,6 +374,10 @@ void FuncCallAST::Semantics(int &Offset) {
     // 检查实参表达式个数和形参数是否一致
     if (FuncRef->ParamNum != static_cast<int>(Params.size())) {
       Errors::ErrorAdd(Line, Column, "函数 " + Name + " 参数个数不匹配");
+      return;
+    }
+
+    if (FuncRef->ParamNum == 0) {
       return;
     }
 
@@ -373,5 +392,29 @@ void FuncCallAST::Semantics(int &Offset) {
     }
   } else {
     Errors::ErrorAdd(Line, Column, "引用未定义的函数 " + Name);
+  }
+}
+
+void ArrayIndexAST::Semantics(int &Offset) {
+  auto preAST = dynamic_cast<VarAST *>(Pre);
+  if (preAST) {
+    auto symbol = SymbolStack.LocateNameGlobal(preAST->Name);
+    if (!symbol) {
+      // 未定义的符号
+      Errors::ErrorAdd(Line, Column, "引用未定义的符号 " + preAST->Name);
+      return;
+    }
+    if (symbol->Kind != 'A') {
+      Errors::ErrorAdd(Line, Column,
+                       "对非数组名采用数组下标形式 " + preAST->Name);
+      return;
+    }
+  }
+
+  Pre->Semantics(Offset);
+  Index->Semantics(Offset);
+  if (Index->Type != T_INT) {
+    Errors::ErrorAdd(Line, Column, "数组下标非整型");
+    return;
   }
 }
