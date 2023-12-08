@@ -1,6 +1,6 @@
 /*********以下程序只完成了部分静态语义检查，需自行补充完整*******************/
-#include <utility>
 #include "parser.tab.hpp"
+#include <utility>
 
 #include "def.h"
 SymbolStackDef AST::SymbolStack = SymbolStackDef(); // 初始化静态成员符号表
@@ -83,8 +83,7 @@ bool IsLeftValue(ExpAST *PExp) {
   return false;
 }
 
-Symbol *SymbolStackDef::LocateNameCurrent(
-    const string &Name) {
+Symbol *SymbolStackDef::LocateNameCurrent(const string &Name) {
   // 在当前(最内层)作用域中查找该符号是否有定义
   SymbolsInAScope *curScope = Symbols.back();
   for (auto &Symbol : curScope->Symbols)
@@ -299,29 +298,35 @@ void CompStmAST::Semantics(int &Offset) {
 }
 
 void ExprStmAST::Semantics(int &Offset) { Exp->Semantics(Offset); }
+
 void IfStmAST::Semantics(int &Offset) {
   Cond->Semantics(Offset);
   ThenStm->Semantics(Offset);
 }
+
 void IfElseStmAST::Semantics(int &Offset) {
   Cond->Semantics(Offset);
   ThenStm->Semantics(Offset);
   ElseStm->Semantics(Offset);
 }
+
 void WhileStmAST::Semantics(int &Offset) {
   Cond->Semantics(Offset);
   Body->Semantics(Offset);
 }
+
 void ForStmAST::Semantics(int &Offset) {
   Init->Semantics(Offset);
   Cond->Semantics(Offset);
   Update->Semantics(Offset);
   Body->Semantics(Offset);
 }
+
 void ReturnStmAST::Semantics(int &Offset) {
   if (Exp)
     Exp->Semantics(Offset);
 }
+
 void BreakStmAST::Semantics(int &Offset) {}
 void ContinueStmAST::Semantics(int &Offset) {}
 
