@@ -9,7 +9,7 @@ SymbolStackDef AST::SymbolStack = SymbolStackDef(); // 初始化静态成员符�
 map<int, int> TypeWidth = {
     {T_CHAR, 1}, {T_INT, 4}, {T_FLOAT, 8}}; // 各类型所占字节数
 map<char, string> KindName = {
-    {'V', "变量"}, {'F', "函数"}, {'P', "形参"}}; // 各类型所占字节数
+    {'V', "变量"}, {'F', "函数"}, {'P', "形参"}, {'A', "数组"}}; // 各类型所占字节数
 
 vector<Error> Errors::Errs = {};
 void Errors::ErrorAdd(int Line, int Column, string ErrMsg) {
@@ -45,8 +45,8 @@ void DisplaySymbolTable(SymbolStackDef *SYM) {
         cout.width(20);
         cout << SymPtr->Name;
         cout.width(8);
-        if (SymPtr->Kind == 'V' ||
-            SymPtr->Kind == 'P') // 符号是变量,形参,显示别名
+        if (SymPtr->Kind == 'V' || SymPtr->Kind == 'P' ||
+            SymPtr->Kind == 'A') // 符号是变量,形参,显示别名
           cout << ((VarSymbol *)SymPtr)->Alias;
         else
           cout << " ";
@@ -62,7 +62,11 @@ void DisplaySymbolTable(SymbolStackDef *SYM) {
           cout << "  变量空间: " << ((FuncSymbol *)SymPtr)->ARSize;
         } else if (SymPtr->Kind == 'A') {
           // 符号是数组，需要显示各维大小
-          // TODO:
+          cout << "维数: " << ((VarSymbol *)SymPtr)->Dims.size();
+          cout << "  各维大小: ";
+          for (auto dim : ((VarSymbol *)SymPtr)->Dims) {
+            cout << dim << " ";
+          }
         }
         cout << endl;
       }
@@ -173,9 +177,15 @@ void VarDecAST::Semantics(int &Offset, TypeAST *Type) {
     } else {
       // array
       VarDefPtr->Kind = 'A';
+      VarDefPtr->Dims = Dims;
     }
     if (typeid(*Type) == typeid(BasicTypeAST)) {
       VarDefPtr->Type = (dynamic_cast<BasicTypeAST *>(Type))->Type;
+      int s = 1;
+      for (auto dim : Dims) {
+        s *= dim;
+      }
+      VarDefPtr->ARSize = TypeWidth[VarDefPtr->Type] * s;
     }
 
     // 设置并增加 offset
@@ -421,12 +431,12 @@ void FuncCallAST::Semantics(int &Offset) {
 
     auto paramSymbols = FuncRef->ParamPtr->Symbols;
     for (int i = 0; i < static_cast<int>(Params.size()); i++) {
+      Params[i]->Semantics(Offset);
       // 检查类型是否一致
       if (Params[i]->Type != paramSymbols[i]->Type) {
         Errors::ErrorAdd(Line, Column, "函数 " + Name + " 参数类型不匹配");
         return;
       }
-      Params[i]->Semantics(Offset);
     }
   } else {
     Errors::ErrorAdd(Line, Column, "引用未定义的函数 " + Name);
@@ -447,6 +457,7 @@ void ArrayIndexAST::Semantics(int &Offset) {
                        "对非数组名采用数组下标形式 " + preAST->Name);
       return;
     }
+    VarRef = reinterpret_cast<VarSymbol *>(symbol);
   }
 
   Pre->Semantics(Offset);

@@ -71,6 +71,10 @@ public:
   string
       Alias; // 别名，为解决中间代码中，作用域嵌套变量同名的显示时的二义性问题
   int Offset; // 变量在对应AR中的偏移量
+
+  vector<int> Dims;                 // 各维大小
+  int ARSize;                       // 数组所占空间大小
+//  SymbolsInAScope *ArrayPtr;        // 指向数组元素的符号表
 };
 
 class FuncSymbol : public Symbol {
@@ -80,8 +84,7 @@ public:
   SymbolsInAScope *ParamPtr{}; // 指向参数的符号表
 };
 
-// TODO: 和 VarSymbol 合并?
-// class ArraySymbol : public Symbol { // 数组名
+//class ArraySymbol : public Symbol { // 数组名
 // public:                             // 数组的内情向量信息
 //  vector<int> Dims;                 // 各维大小
 //  int ARSize;                       // 数组所占空间大小
@@ -437,10 +440,11 @@ class ArrayIndexAST : public ExpAST { // 数组下标取值
 public:
   ExpAST *Pre{}; // type: ArrayIndexAST | VarAST
   ExpAST *Index{};
+  VarSymbol* VarRef{};
 
   void DisplayAST(int indent) override;
   void Semantics(int &Offset) override;
-  Opn GenIR(int &TempOffset) override;
+  Opn GenIR(int &TempVarOffset) override;
   void GenIR(int &TempVarOffset, string LabelTrue, string LabelFalse) override;
 };
 #endif // AST_H 在遍历语法树
