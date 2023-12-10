@@ -156,6 +156,10 @@ void VarDecAST::GenIR() { // 有初始化表达式，需要生成中间代码
 }
 
 void DefAST::GenIR() {
+  if (typeid(*Type) == typeid(StructTypeAST)) {
+    return;
+  }
+
   list<IRCode>::iterator it;
   for (auto a : LocVars) {
     a->GenIR();
@@ -164,7 +168,13 @@ void DefAST::GenIR() {
   }
 }
 
+//void StructDefAST::GenIR() {}
+
+void ExtStructDefAST::GenIR() {}
+
 void BasicTypeAST::GenIR() {}
+
+void StructTypeAST::GenIR() {}
 
 void FuncDefAST::GenIR() {
   for (auto a : Params) {
@@ -621,3 +631,10 @@ void ArrayIndexAST::GenIR(int &TempVarOffset, std::string LabelTrue,
   IRCodes.emplace_back(JNE, Result, Zero, Opn(LabelTrue, 0, 0));
   IRCodes.emplace_back(GOTO, Opn(), Opn(), Opn(LabelFalse, 0, 0));
 }
+
+Opn StructValueAST::GenIR(int &TempVarOffset) {
+  return Opn{};
+}
+
+void StructValueAST::GenIR(int &TempVarOffset, std::string LabelTrue,
+                           std::string LabelFalse) {}

@@ -12,15 +12,18 @@ void space(int indent) {
     cout << " ";
 }
 map<int, string> SymbolMap = {
-    {T_CHAR, "char"}, {T_INT, "int"}, {T_FLOAT, "float"}, {T_VOID, "void"},
-    {GT, ">"},        {GE, ">="},     {LT, "<"},          {LE, "<="},
-    {EQ, "=="},       {NE, "!="},     {PLUS, "+"},        {MINUS, "-"},
-    {UPLUS, "*"},     {UMINUS, "/"},  {ASSIGN, "="},      {AND, "&&"},
-    {OR, "||"},       {NOT, "!"},    {DMINUS, "--"},     {DPLUS, "++"}};
+    {T_CHAR, "char"},     {T_INT, "int"}, {T_FLOAT, "float"}, {T_VOID, "void"},
+    {T_STRUCT, "struct"}, {GT, ">"},      {GE, ">="},         {LT, "<"},
+    {LE, "<="},           {EQ, "=="},     {NE, "!="},         {PLUS, "+"},
+    {MINUS, "-"},         {UPLUS, "*"},   {UMINUS, "/"},      {ASSIGN, "="},
+    {AND, "&&"},          {OR, "||"},     {NOT, "!"},         {DMINUS, "--"},
+    {DPLUS, "++"}};
+
 void ProgAST::DisplayAST(
     int indent) { // 依次显示向量ExtDefs中的各个外部定义(外部变量定义和函数定义)
-  for (auto a : ExtDefs)
+  for (auto a : ExtDefs) {
     a->DisplayAST(0);
+  }
 }
 
 void ExtVarDefAST::DisplayAST(int indent) { // 显示外部变量定义
@@ -39,16 +42,23 @@ void BasicTypeAST::DisplayAST(int indent) { // 显示基本类型名符号串
   cout << SymbolMap[Type];
 }
 
+void StructTypeAST::DisplayAST(int indent) {
+  // TODO: implement me
+  cout << "StructTypeAST: not implement" << endl;
+}
+
 void VarDecAST::DisplayAST(int indent) { // 显示外部变量定义中的单个变量
   space(indent);
   cout << Name;       // 显示变量名
-  for (auto a : Dims) // 如果是数组，依次显示各维大小
+  for (auto a : Dims) {
+    // 如果是数组，依次显示各维大小
     cout << "[" << a << "]";
-  if (Exp) // 有初始化表达式
-  {
+  }
+  if (Exp) {
+    // 有初始化表达式
     cout << "= ";
     if (typeid(*Exp) == typeid(BinaryExprAST)) {
-      cout << SymbolMap[((BinaryExprAST *)Exp)->Op] << endl;
+      cout << SymbolMap[(dynamic_cast<BinaryExprAST *>(Exp))->Op] << endl;
       (dynamic_cast<BinaryExprAST *>(Exp))
           ->LeftExp->DisplayAST(indent + static_cast<int>(Name.length()) + 5);
       cout << endl;
@@ -66,9 +76,9 @@ void FuncDefAST::DisplayAST(int indent) { // 显示函数定义
   Type->DisplayAST(indent);
   cout << endl << "    函 数 名：" << Name << endl; // 显示函数名
   cout << "    形 参 表：";                         // 显示形参
-  if (Params.empty())
+  if (Params.empty()) {
     cout << "无" << endl;
-  else {
+  } else {
     cout << endl;
     for (auto a : Params)
       a->DisplayAST(14);
@@ -87,16 +97,19 @@ void ParamAST::DisplayAST(int indent) { // 显示形式参数
 /***********各种语句结点***************/
 void CompStmAST::DisplayAST(int indent) { // 显示复合语句
   space(indent);
-  if (indent)
+  if (indent) {
     cout << "复合语句：" << endl;
-  else
+  } else {
     indent = 8; // 显示函数体
+  }
+
   if (!Decls.empty()) {
     space(indent + 2);
     cout << "说明部分:" << endl;
     for (auto a : Decls)
       a->DisplayAST(indent + 4);
   }
+
   if (!Stms.empty()) {
     space(indent + 2);
     cout << "语句部分:" << endl;
@@ -106,9 +119,9 @@ void CompStmAST::DisplayAST(int indent) { // 显示复合语句
 }
 
 void ExprStmAST::DisplayAST(int indent) { // 显示表达式语句
-  if (typeid(*Exp) == typeid(FuncCallAST))
+  if (typeid(*Exp) == typeid(FuncCallAST)) {
     Exp->DisplayAST(indent); // 对形式为函数调用后接分号的函数调用语句
-  else {
+  } else {
     space(indent);
     cout << "表达式语句：" << endl;
     Exp->DisplayAST(indent + 4);
@@ -207,6 +220,14 @@ void DefAST::DisplayAST(int indent) { // 显示局部变量
   cout << endl;
 }
 
+//void StructDefAST::DisplayAST(int indent) {
+//  cout << "StructDefAST: not implement" << endl;
+//}
+
+void ExtStructDefAST::DisplayAST(int indent) {
+  cout << "ExtStructDefAST: not implement" << endl;
+}
+
 /***********表达式结点***************/
 void AssignAST::DisplayAST(int indent) { // 显示赋值表达式
   space(indent);
@@ -278,4 +299,12 @@ void ArrayIndexAST::DisplayAST(int indent) {
   cout << "数组下标取值：" << endl;
   Pre->DisplayAST(indent + 4);
   Index->DisplayAST(indent + 4);
+}
+
+void StructValueAST::DisplayAST(int indent) {
+  // TODO: implement me
+  //  space(indent);
+  //  cout << "结构体成员取值：" << endl;
+  //  space(indent + 4);
+  //  cout << "成员名：" << Name << endl;
 }

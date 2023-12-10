@@ -20,6 +20,8 @@ class VarDecAST;
 class ParamAST;
 class CompStmAST;
 class ExpAST;
+class StructTypeAST;
+class DefAST;
 
 class VarSymbol;
 class FuncSymbol;
@@ -30,6 +32,7 @@ extern map<int, string> SymbolMap;
 extern map<int, int> TypeWidth;
 
 enum BasicTypes { T_CHAR, T_INT, T_FLOAT, T_VOID };
+enum CompoundTypes { T_STRUCT = 4, T_UNION };
 
 static string TypeName(BasicTypes Type) {
   switch (Type) {
@@ -61,9 +64,8 @@ public:
 class Symbol {
 public:
   string Name;
-  // TODO: add struct?
-  int Type; // 符号类型，目前仅基本类型T_CHAR,T_INT,T_FLOAT，T_VOID
-  char Kind; // 符号种类：基本变量V，函数名F，参数P，数组A等
+  int Type;  // 符号类型，目前 T_CHAR, T_INT, T_FLOAT, T_VOID, T_STRUCT
+  char Kind; // 符号种类：基本变量 V, 函数名 F, 参数 P, 数组 A, 结构体 S 等
 };
 
 class VarSymbol : public Symbol {
@@ -72,9 +74,10 @@ public:
       Alias; // 别名，为解决中间代码中，作用域嵌套变量同名的显示时的二义性问题
   int Offset; // 变量在对应AR中的偏移量
 
-  vector<int> Dims;                 // 各维大小
-  int ARSize;                       // 数组所占空间大小
-//  SymbolsInAScope *ArrayPtr;        // 指向数组元素的符号表
+  vector<int> Dims; // 各维大小
+  int ARSize;       // 数组所占空间大小
+  //  SymbolsInAScope *ArrayPtr;        // 指向数组元素的符号表
+  SymbolsInAScope *FieldPtr; // 指向结构体字段的符号表
 };
 
 class FuncSymbol : public Symbol {
@@ -84,12 +87,12 @@ public:
   SymbolsInAScope *ParamPtr{}; // 指向参数的符号表
 };
 
-//class ArraySymbol : public Symbol { // 数组名
-// public:                             // 数组的内情向量信息
-//  vector<int> Dims;                 // 各维大小
-//  int ARSize;                       // 数组所占空间大小
-//  SymbolsInAScope *ArrayPtr;        // 指向数组元素的符号表
-//};
+// class ArraySymbol : public Symbol { // 数组名
+//  public:                             // 数组的内情向量信息
+//   vector<int> Dims;                 // 各维大小
+//   int ARSize;                       // 数组所占空间大小
+//   SymbolsInAScope *ArrayPtr;        // 指向数组元素的符号表
+// };
 
 class SymbolsInAScope { // 单一作用域的符号名，每个复合语句对应一个符号表
 public:
@@ -174,8 +177,18 @@ class ExtDefAST : public AST {}; // 外部变量，函数的父类
 /*外部变量类定义*/
 class ExtVarDefAST : public ExtDefAST { // 外部变量定义
 public:
-  TypeAST *Type;               // 外部变量类型
-  vector<VarDecAST *> ExtVars; // 外部变量列表
+  TypeAST *Type{};               // 外部变量类型
+  vector<VarDecAST *> ExtVars{}; // 外部变量列表
+
+  void DisplayAST(int indent) override;
+  void Semantics(int &Offset) override;
+  void GenIR() override;
+};
+
+class ExtStructDefAST : public ExtDefAST { // 结构类型名
+public:
+  StructTypeAST *TypeAST{};
+  vector<VarDecAST *> Vars{};
 
   void DisplayAST(int indent) override;
   void Semantics(int &Offset) override;
@@ -193,21 +206,17 @@ public:
   void GenIR() override;
 };
 
-//class StructTypeAST : public TypeAST { // 结构类型名
-//public:
-//  string Name;
-//
-//  void DisplayAST(int indent) override;
-//  void Semantics(int &Offset) override;
-//  void GenIR() override;
-//};
+class StructTypeAST : public TypeAST { // 结构类型名
+public:
+  string Name{};
+  CompoundTypes Type{}; // T_STRUCT
+  vector<DefAST *> Fields{};
+  bool IsDef{};
 
-// class StructDefAST:public TypeAST{//结构类型名
-// public:
-//     string Name;
-//     vector <defAST *> vars;
-//     void DisplayAST(int indent) override;
-// };
+  void DisplayAST(int indent) override;
+  void Semantics(int &Offset) override;
+  void GenIR() override;
+};
 
 class VarDecAST : public AST { // 简单变量（标识符）、数组的定义
 public:
@@ -262,6 +271,16 @@ public:
   void Semantics(int &Offset) override;
   void GenIR() override;
 };
+
+// class StructDefAST : public AST {
+// public:
+//   StructTypeAST *TypeAST{};
+//   vector<VarDecAST *> Vars{};
+
+//   void DisplayAST(int indent) override;
+//   void Semantics(int &Offset) override;
+//   void GenIR() override;
+// };
 
 /*语句结点类定义*/
 class StmAST : public AST {};      // 所有语句的父类
@@ -440,11 +459,24 @@ class ArrayIndexAST : public ExpAST { // 数组下标取值
 public:
   ExpAST *Pre{}; // type: ArrayIndexAST | VarAST
   ExpAST *Index{};
-  VarSymbol* VarRef{};
+  VarSymbol *VarRef{};
 
   void DisplayAST(int indent) override;
   void Semantics(int &Offset) override;
   Opn GenIR(int &TempVarOffset) override;
   void GenIR(int &TempVarOffset, string LabelTrue, string LabelFalse) override;
 };
+
+class StructValueAST : public ExpAST { // 结构体成员取值
+public:
+  string Name; // 结构体
+  string Field;
+  VarSymbol *VarRef{}; // 指向符号表
+
+  void DisplayAST(int indent) override;
+  void Semantics(int &Offset) override;
+  Opn GenIR(int &TempVarOffset) override;
+  void GenIR(int &TempVarOffset, string LabelTrue, string LabelFalse) override;
+};
+
 #endif // AST_H 在遍历语法树

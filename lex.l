@@ -40,11 +40,13 @@ charconst \'([^'\\]|\\.)\'
 "for"       {return FOR;}
 "break"     {return BREAK;}
 "continue"  {return CONTINUE;}
+"struct"    {return STRUCT;}
 
 
 {id}	{strcpy(yylval.type_id,yytext); return ID;}
 ";"	    {return SEMI;}
 ","	    {return COMMA;}
+"."     {return DOT;}
 ">="	{strcpy(yylval.type_id, yytext);return GE;}
 ">"	    {strcpy(yylval.type_id, yytext);return GT;}
 "<="	{strcpy(yylval.type_id, yytext);return LE;}

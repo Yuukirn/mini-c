@@ -8,8 +8,12 @@ SymbolStackDef AST::SymbolStack = SymbolStackDef(); // 初始化静态成员符�
 // TODO: 数组字节
 map<int, int> TypeWidth = {
     {T_CHAR, 1}, {T_INT, 4}, {T_FLOAT, 8}}; // 各类型所占字节数
-map<char, string> KindName = {
-    {'V', "变量"}, {'F', "函数"}, {'P', "形参"}, {'A', "数组"}}; // 各类型所占字节数
+map<string , int> StructWidth{}; // k: name  v: size, 对 StructType 做语义分析时填入
+map<char, string> KindName = {{'V', "变量"},
+                              {'F', "函数"},
+                              {'P', "形参"},
+                              {'A', "数组"},
+                              {'S', "结构体"}}; // 各类型所占字节数
 
 vector<Error> Errors::Errs = {};
 void Errors::ErrorAdd(int Line, int Column, string ErrMsg) {
@@ -179,6 +183,10 @@ void VarDecAST::Semantics(int &Offset, TypeAST *Type) {
       VarDefPtr->Kind = 'A';
       VarDefPtr->Dims = Dims;
     }
+    if (typeid(*Type) == typeid(StructTypeAST)) {
+      VarDefPtr->Kind = 'S';
+      VarDefPtr->Type = T_STRUCT;
+    }
     if (typeid(*Type) == typeid(BasicTypeAST)) {
       VarDefPtr->Type = (dynamic_cast<BasicTypeAST *>(Type))->Type;
       int s = 1;
@@ -190,7 +198,18 @@ void VarDecAST::Semantics(int &Offset, TypeAST *Type) {
 
     // 设置并增加 offset
     VarDefPtr->Offset = Offset;
-    Offset += TypeWidth[VarDefPtr->Type];
+    if (typeid(*Type) == typeid(BasicTypeAST)) {
+      Offset += TypeWidth[VarDefPtr->Type];
+    } else if (typeid(*Type) == typeid(StructTypeAST)) {
+      auto structType = dynamic_cast<StructTypeAST *>(Type);
+      auto structSymbol = SymbolStack.LocateNameGlobal(structType->Name);
+      // TODO: ?
+      if (!structSymbol) {
+        Errors::ErrorAdd(Line, Column, "结构体 " + structType->Name + " 未定义");
+        return;
+      }
+      Offset += StructWidth[structSymbol->Name];
+    }
 
     if (Exp) {
       // 有初值表达式时的处理
@@ -203,12 +222,71 @@ void VarDecAST::Semantics(int &Offset, TypeAST *Type) {
 }
 
 void DefAST::Semantics(int &Offset) { // 依次提取变量符号进行语义分析
+  if (typeid(*Type) == typeid(StructTypeAST)) {
+    Type->Semantics(Offset);
+  }
   for (auto a : LocVars) {
     a->Semantics(Offset, Type);
   }
 }
 
+//void StructDefAST::Semantics(int &Offset) {
+//  auto symbol = SymbolStack.LocateNameGlobal(TypeAST->Name);
+//  if (!symbol) {
+//    Errors::ErrorAdd(Line, Column, "结构体 " + TypeAST->Name + " 未定义");
+//    return;
+//  }
+//  for (auto a : Vars) {
+//    a->Semantics(Offset, TypeAST);
+//  }
+//}
+
+void ExtStructDefAST::Semantics(int &Offset) {
+  TypeAST->Semantics(Offset);
+  for (auto a : Vars) {
+    a->Semantics(Offset, TypeAST);
+  }
+}
+
 void BasicTypeAST::Semantics(int &Offset) {}
+
+void StructTypeAST::Semantics(int &Offset) {
+  auto symbol = SymbolStack.LocateNameGlobal(Name);
+  if (!symbol) {
+    if (!IsDef) {
+      Errors::ErrorAdd(Line, Column, "结构体 " + Name + " 未定义");
+      return;
+    }
+    auto VarDefPtr = new VarSymbol();
+    VarDefPtr->Name = Name;
+    VarDefPtr->Alias = NewAlias();
+    VarDefPtr->Kind = 'S';
+    VarDefPtr->Type = T_STRUCT;
+    VarDefPtr->FieldPtr = new SymbolsInAScope();
+    SymbolStack.Symbols.back()->Symbols.push_back(VarDefPtr);
+
+    // 设置并增加 offset
+    VarDefPtr->Offset = Offset;
+
+    int structSize = 0;
+    // 填写结构体成员符号表
+    SymbolStack.Symbols.push_back(VarDefPtr->FieldPtr);
+    for (auto a : Fields) {
+      a->Semantics(Offset);
+      if (typeid(a->Type) == typeid(BasicTypeAST)) {
+        structSize += TypeWidth[(dynamic_cast<BasicTypeAST *>(a->Type))->Type];
+      } else if (typeid(a->Type) == typeid(StructTypeAST)) {
+        auto structType = dynamic_cast<StructTypeAST *>(a->Type);
+        structSize += StructWidth[structType->Name];
+      }
+    }
+    StructWidth[Name] = structSize;
+    VarDefPtr->ARSize = structSize;
+    SymbolStack.Symbols.pop_back();
+  } else if (IsDef) {
+    Errors::ErrorAdd(Line, Column, "结构体 " + Name + " 重复定义");
+  }
+}
 
 void FuncDefAST::Semantics(int &Offset) {
   if (!SymbolStack.LocateNameCurrent(Name)) {
@@ -400,6 +478,26 @@ void UnaryExprAST::Semantics(int &Offset) {
       Errors::ErrorAdd(Line, Column, "非左值表达式");
       return;
     }
+
+    if (typeid(*Exp) == typeid(VarAST)) {
+      auto varAST = dynamic_cast<VarAST *>(Exp);
+      auto symbol = SymbolStack.LocateNameGlobal(varAST->Name);
+      if (!symbol) {
+        // 未定义的符号
+        Errors::ErrorAdd(Line, Column, "引用未定义的符号 " + varAST->Name);
+        return;
+      }
+
+      if (symbol->Kind == 'S') {
+        Errors::ErrorAdd(Line, Column, "对结构体成员采用自增自减形式 " + varAST->Name);
+        return;
+      }
+
+      if (symbol->Kind != 'V') {
+        Errors::ErrorAdd(Line, Column, "对非变量名采用自增自减形式 " + varAST->Name);
+        return;
+      }
+    }
   }
   Exp->Semantics(Offset);
 }
@@ -465,5 +563,38 @@ void ArrayIndexAST::Semantics(int &Offset) {
   if (Index->Type != T_INT) {
     Errors::ErrorAdd(Line, Column, "数组下标非整型");
     return;
+  }
+}
+
+void StructValueAST::Semantics(int &Offset) {
+  auto symbol = SymbolStack.LocateNameGlobal(Name);
+  if (!symbol) {
+    // 未定义的符号
+    Errors::ErrorAdd(Line, Column, "引用未定义的符号 " + Name);
+    return;
+  }
+
+  if (symbol->Kind != 'S') {
+    Errors::ErrorAdd(Line, Column, "对非结构体名采用结构体成员形式 " + Name);
+    return;
+  }
+
+  VarRef = reinterpret_cast<VarSymbol *>(symbol);
+  if (VarRef) {
+    Type = static_cast<BasicTypes>(VarRef->Type);
+
+    bool fieldExists = false;
+    for (auto &s : VarRef->FieldPtr->Symbols) {
+      if (s->Name == Field) {
+        fieldExists = true;
+        break;
+      }
+    }
+
+    if (!fieldExists) {
+      Errors::ErrorAdd(Line, Column, "结构体 " + Name + " 不存在成员 " + Field);
+    }
+  } else {
+    Errors::ErrorAdd(Line, Column, "引用未定义的符号 " + Name);
   }
 }

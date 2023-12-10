@@ -22,6 +22,7 @@ typedef struct YYLVAL
     ExtDefAST   *ExtDef;
     vector <VarDecAST*>  ExtDecList;        //外部、局部变量列表
     TypeAST     *Specifier;
+    StructTypeAST *StructSpecifier;
     VarDecAST *VarDec;
     CompStmAST  *CompSt;
 	vector <ParamAST *>  ParamList;         //形参列表
@@ -45,6 +46,7 @@ typedef struct YYLVAL
 %type  <ExtDef>     ExtDef
 %type  <ExtDecList> ExtDecList
 %type  <Specifier>  Specifier
+%type  <StructSpecifier> StructSpecifier
 %type  <VarDec>     VarDec
 %type  <CompSt>     CompSt
 %type  <ParamList>  ParamList
@@ -67,7 +69,7 @@ typedef struct YYLVAL
 %token <type_float> FLOAT               /*指定float常量的语义值是type_float*/
 %token <type_char> CHAR
 
-%token DPLUS DMINUS LP RP LB RB LC RC SEMI COMMA     /*用bison对该文件编译时，带参数-d，生成的exp.tab.h中给这些单词进行编码，可在lex.l中包含parser.tab.h使用这些单词种类码*/
+%token DPLUS DMINUS LP RP LB RB LC RC SEMI COMMA DOT     /*用bison对该文件编译时，带参数-d，生成的exp.tab.h中给这些单词进行编码，可在lex.l中包含parser.tab.h使用这些单词种类码*/
 %token PLUS MINUS STAR DIV GE GT LE LT NE EQ ASSIGN AND OR NOT IF ELSE WHILE RETURN FOR COLON STRUCT BREAK CONTINUE
 
 /*以下为接在上述token后依次编码的枚举常量，用于后续过程*/
@@ -106,8 +108,8 @@ ExtDefList: {$$=vector <ExtDefAST*>();}
 
 ExtDef:   Specifier ExtDecList SEMI   { ExtVarDefAST *t=new ExtVarDefAST();     //创建一个外部变量声明的对象
                                         t->Type=$1; t->ExtVars=$2;$$=t;SavePosition;}
-  //       | StructSpecifier SEMI   {}
-//         | StructSpecifier ExtDecList SEMI   {}
+         | StructSpecifier ExtDecList SEMI {ExtStructDefAST *t=new ExtStructDefAST();t->TypeAST=$1;t->Vars=$2;$$=t;SavePosition;}
+         | StructSpecifier SEMI {ExtStructDefAST *t=new ExtStructDefAST();$1->IsDef=true;t->TypeAST=$1;$$=t;SavePosition;}
          | Specifier ID LP ParamList RP CompSt  {FuncDefAST *t=new FuncDefAST();t->Type=$1;t->Name=$2;t->Params=$4; t->Body=$6;$$=t;SavePosition;}//对应一个函数定义对象
          | Specifier ID LP ParamList RP SEMI   {FuncDefAST *t=new FuncDefAST();t->Type=$1;t->Name=$2;t->Params=$4;$$=t;SavePosition;}//对应一个函数声明对象，Body为空
          ;
@@ -118,11 +120,14 @@ Specifier: TYPE  {  BasicTypeAST *t=new BasicTypeAST(); ;
                     if (string($1)==string("void"))   t->Type=T_VOID;  $$=t;SavePosition;}
               ;
 
-//StructSpecifier: STRUCT ID  {ExtDefList}      //结构类型
-            ;
+StructSpecifier: STRUCT ID LC DefList RC {StructTypeAST *t=new StructTypeAST();t->Type=T_STRUCT;t->Name=$2;t->Fields=$4;t->IsDef=false;$$=t;SavePosition;}
+         | STRUCT ID {StructTypeAST *t=new StructTypeAST();t->Type=T_STRUCT;t->Name=$2;t->IsDef=false;$$=t;SavePosition;}
+         ;
+
 ExtDecList:  VarDec  {$$=vector < VarDecAST*>();$$.push_back($1);}      /*ExtDecList对应一个外部变量VarDec的序列,目前后续只考虑是标识符，可扩展为数组*/
            | VarDec COMMA ExtDecList {$3.insert($3.begin(),$1);$$=$3;}
            ;
+
 VarDec:  ID   {$$=new VarDecAST();$$->Name=string($1);$$->Line=yylloc.first_line;$$->Column=yylloc.first_column;}             //变量对象，dims.size()为0表示简单变量，大于0表示数组
           | VarDec LB INT RB   {$1->Dims.push_back($3);$$=$1;} //将数组的每维大小添加到属性Dims中
           ;
@@ -144,6 +149,8 @@ DefList: {$$=vector <DefAST *>();  }
         ;
 Def:   Specifier DecList SEMI {$$=new DefAST();$$->Type=$1;$$->LocVars=$2;
                                $$->Line=yylloc.first_line;$$->Column=yylloc.first_column;}
+        | StructSpecifier DecList SEMI {$$=new DefAST();$$->Type=$1;$$->LocVars=$2;
+                               $$->Line=yylloc.first_line;$$->Column=yylloc.first_column;}
 //      | error SEMI   {$$=NULL;}
               ;
 DecList: Dec  {$$=vector <VarDecAST *>(); $$.push_back($1);}
@@ -151,13 +158,13 @@ DecList: Dec  {$$=vector <VarDecAST *>(); $$.push_back($1);}
 	   ;
 Dec:  VarDec  {$$=$1;}                  //如何将多种形式的局部变量加上一个父类，简单，数组，初始化
        | VarDec ASSIGN Exp  {$$=$1;$$->Exp=$3; }      //带初始化的变量定义
-       | VarDec ASSIGN LC ArrExp RC     {}
+       /* | VarDec ASSIGN LC ArrExp RC     {} */
       ;
-ArrExp: Exp                          {}
+/* ArrExp: Exp                          {}
        |LC ArrExp RC                 {}
        |LC ArrExp RC COMMA ArrExp    {}
        |ArrExp COMMA Exp             {}
-       ;
+       ; */
 
 
 Stmt:   Exp SEMI    		{ExprStmAST *t=new ExprStmAST();t->Exp=$1;$$=t;SavePosition;}
@@ -195,7 +202,8 @@ Exp:    Exp ASSIGN Exp {AssignAST *t=new AssignAST();t->Op=ASSIGN;
       | Exp NE Exp 	{BinaryExprAST *t=new BinaryExprAST();t->Op=NE;t->LeftExp=$1;t->RightExp=$3;$$=t;SavePosition;}
       | Exp EQ Exp 	{BinaryExprAST *t=new BinaryExprAST();t->Op=EQ;t->LeftExp=$1;t->RightExp=$3;$$=t;SavePosition;}
 
-      | Exp LB Exp RB {ArrayIndexAST *t=new ArrayIndexAST();t->Pre=$1;t->Index=$3;$$=t;SavePosition;}  //数组下标取值
+      | Exp LB Exp RB   {ArrayIndexAST *t=new ArrayIndexAST();t->Pre=$1;t->Index=$3;$$=t;SavePosition;}  //数组下标取值
+      | ID DOT ID       {StructValueAST *t=new StructValueAST();t->Name=$1;t->Field=$3;$$=t;SavePosition;} //结构体取值
 
       | DPLUS  Exp      {UnaryExprAST *t=new UnaryExprAST();t->Op=DPLUS;t->Exp=$2;$$=t;SavePosition;}    //自增、自减运算符。。。可区分前后缀形式
       | DMINUS Exp      {UnaryExprAST *t=new UnaryExprAST();t->Op=DMINUS;t->Exp=$2;$$=t;SavePosition;}
