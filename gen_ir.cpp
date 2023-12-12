@@ -603,6 +603,11 @@ Opn ArrayIndexAST::GenIR(int &TempVarOffset) {
   Opn Opn1 = Pre->GenIR(TempVarOffset);
   Opn Opn2 = Index->GenIR(TempVarOffset);
 
+  if (!VarRef) {
+    // NOTE: 为 nullptr 说明是多维数组，这里不考虑多维数组的 IR
+    return Opn{};
+  }
+
   Opn Result(NewTemp(), VarRef->Type, TempVarOffset + MaxVarSize);
   TempVarOffset += TypeWidth[VarRef->Type];
   if (TempVarOffset > MaxTempVarOffset) {
