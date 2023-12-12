@@ -377,13 +377,9 @@ void ReturnStmAST::GenIR() {
   IRCodes.emplace_back(RETURN, Opn(), Opn(), Result);
 }
 
-void BreakStmAST::GenIR() {
-  // TODO: implement me
-}
+void BreakStmAST::GenIR() {}
 
-void ContinueStmAST::GenIR() {
-  // TODO: implement me
-}
+void ContinueStmAST::GenIR() {}
 
 /**************表达式的中间代码生成************************/
 Opn VarAST::GenIR(int &TempVarOffset) {

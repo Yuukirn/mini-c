@@ -77,6 +77,7 @@ public:
   vector<int> Dims; // 各维大小
   int ARSize;       // 数组所占空间大小
   //  SymbolsInAScope *ArrayPtr;        // 指向数组元素的符号表
+  string StructName;
   SymbolsInAScope *FieldPtr; // 指向结构体字段的符号表
 };
 
@@ -469,7 +470,7 @@ public:
 
 class StructValueAST : public ExpAST { // 结构体成员取值
 public:
-  string Name; // 结构体
+  string Name; // 变量名
   string Field;
   VarSymbol *VarRef{}; // 指向符号表
 

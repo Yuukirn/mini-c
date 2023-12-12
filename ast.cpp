@@ -43,8 +43,19 @@ void BasicTypeAST::DisplayAST(int indent) { // 显示基本类型名符号串
 }
 
 void StructTypeAST::DisplayAST(int indent) {
-  // TODO: implement me
-  cout << "StructTypeAST: not implement" << endl;
+  cout << "结构体名: " << endl;
+
+  space(indent + 4);
+  cout << Name << endl;
+
+  if (IsDef) {
+    space(indent);
+    cout << "字段: " << endl;
+
+    for (auto a : Fields) {
+      a->DisplayAST(indent + 4);
+    }
+  }
 }
 
 void VarDecAST::DisplayAST(int indent) { // 显示外部变量定义中的单个变量
@@ -211,7 +222,7 @@ void ContinueStmAST::DisplayAST(int indent) {
 void DefAST::DisplayAST(int indent) { // 显示局部变量
   space(indent);
   cout << "类型：";
-  Type->DisplayAST(0);
+  Type->DisplayAST(indent);
   cout << endl;
   space(indent);
   cout << "变量列表: " << endl;
@@ -225,7 +236,20 @@ void DefAST::DisplayAST(int indent) { // 显示局部变量
 //}
 
 void ExtStructDefAST::DisplayAST(int indent) {
-  cout << "ExtStructDefAST: not implement" << endl;
+  space(indent);
+  cout << "结构体定义: " << endl;
+
+  space(indent + 4);
+  cout << "类型: ";
+  TypeAST->DisplayAST(indent + 8);
+
+  if (!Vars.empty()) {
+    space(indent + 4);
+    cout << "变量列表: " << endl;
+    for (auto a : Vars) {
+      a->DisplayAST(indent + 8);
+    }
+  }
 }
 
 /***********表达式结点***************/
@@ -302,9 +326,15 @@ void ArrayIndexAST::DisplayAST(int indent) {
 }
 
 void StructValueAST::DisplayAST(int indent) {
-  // TODO: implement me
-  //  space(indent);
-  //  cout << "结构体成员取值：" << endl;
-  //  space(indent + 4);
-  //  cout << "成员名：" << Name << endl;
+  space(indent);
+  cout << "结构体: " << endl;
+
+  space(indent + 2);
+  cout << Name << endl;
+
+  space(indent);
+  cout << "字段: " << endl;
+
+  space(indent + 2);
+  cout << Field << endl;
 }

@@ -8,7 +8,8 @@ SymbolStackDef AST::SymbolStack = SymbolStackDef(); // 初始化静态成员符�
 // TODO: 数组字节
 map<int, int> TypeWidth = {
     {T_CHAR, 1}, {T_INT, 4}, {T_FLOAT, 8}}; // 各类型所占字节数
-map<string , int> StructWidth{}; // k: name  v: size, 对 StructType 做语义分析时填入
+map<string, int>
+    StructWidth{}; // k: name  v: size, 对 StructType 做语义分析时填入
 map<char, string> KindName = {{'V', "变量"},
                               {'F', "函数"},
                               {'P', "形参"},
@@ -86,6 +87,10 @@ bool IsLeftValue(ExpAST *PExp) {
   }
   if (typeid(*PExp) == typeid(ArrayIndexAST)) {
     // 数组下标表达式
+    return true;
+  }
+  if (typeid(*PExp) == typeid(StructValueAST)) {
+    // 结构体成员表达式
     return true;
   }
   return false;
@@ -186,6 +191,7 @@ void VarDecAST::Semantics(int &Offset, TypeAST *Type) {
     if (typeid(*Type) == typeid(StructTypeAST)) {
       VarDefPtr->Kind = 'S';
       VarDefPtr->Type = T_STRUCT;
+      VarDefPtr->StructName = dynamic_cast<StructTypeAST *>(Type)->Name;
     }
     if (typeid(*Type) == typeid(BasicTypeAST)) {
       VarDefPtr->Type = (dynamic_cast<BasicTypeAST *>(Type))->Type;
@@ -203,11 +209,12 @@ void VarDecAST::Semantics(int &Offset, TypeAST *Type) {
     } else if (typeid(*Type) == typeid(StructTypeAST)) {
       auto structType = dynamic_cast<StructTypeAST *>(Type);
       auto structSymbol = SymbolStack.LocateNameGlobal(structType->Name);
-      // TODO: ?
       if (!structSymbol) {
-        Errors::ErrorAdd(Line, Column, "结构体 " + structType->Name + " 未定义");
+        Errors::ErrorAdd(Line, Column,
+                         "结构体 " + structType->Name + " 未定义");
         return;
       }
+      // TODO: ?
       Offset += StructWidth[structSymbol->Name];
     }
 
@@ -230,16 +237,16 @@ void DefAST::Semantics(int &Offset) { // 依次提取变量符号进行语义分
   }
 }
 
-//void StructDefAST::Semantics(int &Offset) {
-//  auto symbol = SymbolStack.LocateNameGlobal(TypeAST->Name);
-//  if (!symbol) {
-//    Errors::ErrorAdd(Line, Column, "结构体 " + TypeAST->Name + " 未定义");
-//    return;
-//  }
-//  for (auto a : Vars) {
-//    a->Semantics(Offset, TypeAST);
-//  }
-//}
+// void StructDefAST::Semantics(int &Offset) {
+//   auto symbol = SymbolStack.LocateNameGlobal(TypeAST->Name);
+//   if (!symbol) {
+//     Errors::ErrorAdd(Line, Column, "结构体 " + TypeAST->Name + " 未定义");
+//     return;
+//   }
+//   for (auto a : Vars) {
+//     a->Semantics(Offset, TypeAST);
+//   }
+// }
 
 void ExtStructDefAST::Semantics(int &Offset) {
   TypeAST->Semantics(Offset);
@@ -273,6 +280,15 @@ void StructTypeAST::Semantics(int &Offset) {
     SymbolStack.Symbols.push_back(VarDefPtr->FieldPtr);
     for (auto a : Fields) {
       a->Semantics(Offset);
+      // 语义分析后，符号表内已有对应的符号项
+      for (auto var : a->LocVars) {
+        auto varSymbol = SymbolStack.LocateNameCurrent(var->Name);
+        if (!varSymbol) {
+          Errors::ErrorAdd(Line, Column, "结构体成员 " + var->Name + " 未定义");
+          return;
+        }
+        SymbolStack.Symbols.back()->Symbols.push_back(varSymbol);
+      }
       if (typeid(a->Type) == typeid(BasicTypeAST)) {
         structSize += TypeWidth[(dynamic_cast<BasicTypeAST *>(a->Type))->Type];
       } else if (typeid(a->Type) == typeid(StructTypeAST)) {
@@ -283,6 +299,7 @@ void StructTypeAST::Semantics(int &Offset) {
     StructWidth[Name] = structSize;
     VarDefPtr->ARSize = structSize;
     SymbolStack.Symbols.pop_back();
+    SymbolStack.Symbols.back()->Symbols.push_back(VarDefPtr);
   } else if (IsDef) {
     Errors::ErrorAdd(Line, Column, "结构体 " + Name + " 重复定义");
   }
@@ -489,12 +506,14 @@ void UnaryExprAST::Semantics(int &Offset) {
       }
 
       if (symbol->Kind == 'S') {
-        Errors::ErrorAdd(Line, Column, "对结构体成员采用自增自减形式 " + varAST->Name);
+        Errors::ErrorAdd(Line, Column,
+                         "对结构体成员采用自增自减形式 " + varAST->Name);
         return;
       }
 
       if (symbol->Kind != 'V') {
-        Errors::ErrorAdd(Line, Column, "对非变量名采用自增自减形式 " + varAST->Name);
+        Errors::ErrorAdd(Line, Column,
+                         "对非变量名采用自增自减形式 " + varAST->Name);
         return;
       }
     }
@@ -573,18 +592,27 @@ void StructValueAST::Semantics(int &Offset) {
     Errors::ErrorAdd(Line, Column, "引用未定义的符号 " + Name);
     return;
   }
+  auto varSymbol = reinterpret_cast<VarSymbol *>(symbol);
+  VarRef = varSymbol;
 
-  if (symbol->Kind != 'S') {
-    Errors::ErrorAdd(Line, Column, "对非结构体名采用结构体成员形式 " + Name);
-    return;
-  }
+  auto structTypeSymbol = SymbolStack.LocateNameGlobal(varSymbol->StructName);
 
-  VarRef = reinterpret_cast<VarSymbol *>(symbol);
-  if (VarRef) {
-    Type = static_cast<BasicTypes>(VarRef->Type);
+  if (structTypeSymbol) {
+    if (structTypeSymbol->Kind != 'S') {
+      Errors::ErrorAdd(Line, Column, "对非结构体名采用结构体成员形式 " + Name);
+      return;
+    }
+    Type = static_cast<BasicTypes>(structTypeSymbol->Type);
+
+    auto ss = reinterpret_cast<VarSymbol *>(structTypeSymbol);
+
+    if (!ss->FieldPtr) {
+      Errors::ErrorAdd(Line, Column, "结构体 " + Name + " 未定义成员");
+      return;
+    }
 
     bool fieldExists = false;
-    for (auto &s : VarRef->FieldPtr->Symbols) {
+    for (auto &s : ss->FieldPtr->Symbols) {
       if (s->Name == Field) {
         fieldExists = true;
         break;
