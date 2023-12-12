@@ -66,8 +66,9 @@ void DisplaySymbolTable(SymbolStackDef *SYM) {
           cout << "形参数: " << ((FuncSymbol *)SymPtr)->ParamNum;
           cout << "  变量空间: " << ((FuncSymbol *)SymPtr)->ARSize;
         } else if (SymPtr->Kind == 'A') {
+          cout << "偏移量: " << ((VarSymbol *)SymPtr)->Offset;
           // 符号是数组，需要显示各维大小
-          cout << "维数: " << ((VarSymbol *)SymPtr)->Dims.size();
+          cout << "  维数: " << ((VarSymbol *)SymPtr)->Dims.size();
           cout << "  各维大小: ";
           for (auto dim : ((VarSymbol *)SymPtr)->Dims) {
             cout << dim << " ";
@@ -205,7 +206,11 @@ void VarDecAST::Semantics(int &Offset, TypeAST *Type) {
     // 设置并增加 offset
     VarDefPtr->Offset = Offset;
     if (typeid(*Type) == typeid(BasicTypeAST)) {
-      Offset += TypeWidth[VarDefPtr->Type];
+      int s = 1;
+      for (auto dim : Dims) {
+        s *= dim;
+      }
+      Offset += TypeWidth[VarDefPtr->Type] * s;
     } else if (typeid(*Type) == typeid(StructTypeAST)) {
       auto structType = dynamic_cast<StructTypeAST *>(Type);
       auto structSymbol = SymbolStack.LocateNameGlobal(structType->Name);
