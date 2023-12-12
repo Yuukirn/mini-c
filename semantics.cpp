@@ -336,11 +336,17 @@ void FuncDefAST::Semantics(int &Offset) {
       a->Semantics(offset); // 未考虑参数用寄存器，只是简单在AR中分配单元
     }
 
+    Body->Semantics(offset); // 对函数中的变量，在AR中接在参数后分配单元
+
     // 检查是否有 return 语句
     bool hasReturn = false;
     for (auto stm : Body->Stms) {
       if (typeid(*stm) == typeid(ReturnStmAST)) {
         hasReturn = true;
+        auto returnStm = reinterpret_cast<ReturnStmAST*>(stm);
+        if (returnStm->Exp->Type != FuncDefPtr->Type) {
+          Errors::ErrorAdd(Line, Column, "函数 " + Name + " 返回类型不匹配");
+        }
         break;
       }
     }
@@ -349,7 +355,6 @@ void FuncDefAST::Semantics(int &Offset) {
       return;
     }
 
-    Body->Semantics(offset); // 对函数中的变量，在AR中接在参数后分配单元
     FuncDefPtr->ARSize =
         MaxVarSize; // 函数变量需要空间大小（未考虑临时变量），后续再加临时变量单元得到AR大小
   } else {
@@ -602,11 +607,12 @@ void StructValueAST::Semantics(int &Offset) {
 
   auto structTypeSymbol = SymbolStack.LocateNameGlobal(varSymbol->StructName);
 
+  if (structTypeSymbol && structTypeSymbol->Kind != 'S') {
+    Errors::ErrorAdd(Line, Column, "对非结构体名采用结构体成员形式 " + Name);
+    return;
+  }
+
   if (structTypeSymbol) {
-    if (structTypeSymbol->Kind != 'S') {
-      Errors::ErrorAdd(Line, Column, "对非结构体名采用结构体成员形式 " + Name);
-      return;
-    }
     Type = static_cast<BasicTypes>(structTypeSymbol->Type);
 
     auto ss = reinterpret_cast<VarSymbol *>(structTypeSymbol);
